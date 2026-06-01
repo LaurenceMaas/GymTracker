@@ -1,0 +1,65 @@
+﻿@page "/manage/{EntityName}"
+@using GymTrackerBusinessService.Generic
+@using GymTrackerDataModel.Models
+@using GymTrackerBusinessService.Repository
+@inject AuthenticationStateProvider AuthStateProvider
+@inject IWorkoutExerciseSetService workoutService
+@inject IExerciseService exerciseService
+@inject IWorkoutScheduleService workoutScheduleService
+
+@if (EntityName == "exercise")
+{
+    <ManageGrid TEntity="Exercise"
+                TGridEntity="EmptyGridModel"
+                TGridEntityDetails="EmptyGridModel"
+                SaveHeaderData="@((x) => exerciseService.SaveExerciseData(x))"
+                EntityName="Exercise"
+                DisplayAddEdit = "false"/>
+
+}
+else if (EntityName == "templateworkout")
+{
+    <ManageGrid TEntity="TemplateWorkout"
+                TGridEntity="WorkoutGroupVM"
+                TGridEntityDetails="WorkoutSetVM"
+                EntityName="Workout"
+                LoadGridData="@(x => workoutService.GetHeaderDataAsync(x))"
+                LoadGridDetailData="@(x => workoutService.GetDetailDataAsync(x))"
+                LoadNewGridData="@((x) => workoutService.OnAddNewExercise(x))"
+                NewDetailData="@((x) => workoutService.OnAddNewExerciseDetail(x))"                
+                UpdateGridData="@((x,y) => workoutService.OnUpdateExerciseAsync(x,y))"
+                UpdateDetailslGrid="@((a,b,c,d) => workoutService.OnUpdateDetailEntryAsync(a,b,c,d))"
+                SaveHeaderData="@((x) => workoutService.SaveWorkoutHeaderData(x))"
+                SaveDetailData="@((x,y) => workoutService.SaveWorkoutExerciseData(x,y))"
+                SaveGridDetailData="@((x) => workoutService.SaveExerciseSetsData(x))"
+                DetailName = "Exercise"
+                DisplayAddEdit="true" />
+}
+else if (EntityName == "workoutschedule")
+{
+
+    <ManageGrid TEntity="DOWWorkout"
+                LoadData="@(() => workoutScheduleService.LoadDOWDataPerUser(_userId))"
+                SaveHeaderData="@((x) => workoutScheduleService.SaveWorkoutScheduleData(x,_userId))"
+                TGridEntity="EmptyGridModel"
+                TGridEntityDetails="EmptyGridModel"
+                EntityName="Workout Schedule"
+                DisplayAddEdit="false" />
+} 
+
+@code {
+    [Parameter]
+    public string? EntityName { get; set; }
+    private AuthenticationState? _authState { get; set; }
+    private Guid _userGuid { get; set; }
+    private string _userId { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        _authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        Guid userGuid = Guid.Parse(_authState.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)!.Value);
+        _userId = userGuid.ToString();
+
+    }
+
+}

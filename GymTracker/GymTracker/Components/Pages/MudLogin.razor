@@ -1,0 +1,72 @@
+@page "/mudlogin"
+@rendermode InteractiveServer
+
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Authentication
+
+@inject HttpClient Http
+@inject NavigationManager Nav
+<PageTitle>Log in</PageTitle>
+
+<MudGrid Justify="Justify.Center" Class="mt-6" xs="12">
+    <MudItem xs="12" smOffset="3" sm="8" md="6" lg="4">
+        <MudPaper Class="pa-6">
+            <form method="post" action="/api/login">
+                <MudStack Spacing="2">
+                    <MudText Typo="Typo.h5">Log in</MudText>
+
+                    <MudTextField T="string"
+                                  Label="Email"
+                                  @bind-Value="Input.Email"
+                                  InputType="InputType.Email"
+                                  Required="true"
+                                  RequiredError="Email is required"
+                                  Name="Email"
+                                  InputAttributes="@(new Dictionary<string, object> { { "name", "Email" }, { "required", "required" } })" />
+
+                    <MudTextField T="string"
+                                  Label="Password"
+                                  @bind-Value="Input.Password"
+                                  InputType="InputType.Password"
+                                  Required="true"
+                                  RequiredError="Password is required"
+                                  Name="Password"
+                                  InputAttributes="@(new Dictionary<string, object> { { "name", "Password" }, { "required", "required" } })" />
+
+                    <MudCheckBox @bind-Value="Input.RememberMe"
+                                 Label="Remember me"
+                                 InputAttributes="@(new Dictionary<string, object> { { "name", "RememberMe" }, { "value", "true" } })" />
+
+                    <input type="hidden" name="returnUrl" value="@(ReturnUrl ?? "/")" />
+
+                    <MudButton Variant="Variant.Filled"
+                               ButtonType="ButtonType.Submit"
+                               Color="Color.Primary">
+                        Log in
+                    </MudButton>
+                </MudStack>
+            </form>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private InputModel Input = new();
+
+    [SupplyParameterFromQuery]
+    private string? ReturnUrl { get; set; }
+
+    private sealed class InputModel
+    {
+        [Required]
+        [EmailAddress]
+        public string Email { get; set; } = "";
+
+        [Required]
+        [DataType(DataType.Password)]
+        public string Password { get; set; } = "";
+
+        [Display(Name = "Remember me?")]
+        public bool RememberMe { get; set; }
+    }
+}

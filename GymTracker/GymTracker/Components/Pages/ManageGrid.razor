@@ -1,0 +1,221 @@
+﻿@using System.Net.Http.Json
+@using GymTrackerBusinessService.Generic
+@using GymTrackerBusinessService.Repository
+@using GymTrackerDataModel.Models
+@using GymTrackerHelpers
+@using System.Linq.Expressions
+@using System.Reflection;
+@using System.ComponentModel;
+@using System.ComponentModel.DataAnnotations;
+@typeparam TEntity
+@typeparam TGridEntity
+@typeparam TGridEntityDetails
+@inject IGenericRepoService<TEntity> repo
+@inject IDialogService DialogService
+
+<MudDataGrid T="TEntity"
+             @ref="_grid"
+             Items="@_gridData"
+             ReadOnly=false
+             EditMode="@DataGridEditMode.Form"
+             QuickFilter="@_quickFilter"
+             Bordered="true" Dense="true"
+             EditTrigger="@DataGridEditTrigger.Manual">
+    <ToolBarContent>
+        <MudText Typo="Typo.h6">@EntityName List</MudText>
+        <MudSpacer />
+        <MudTextField @bind-Value="_searchString" Placeholder="Search" Adornment="Adornment.Start" Immediate="true"
+                      AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0"></MudTextField>
+        <MudSpacer />
+        <MudButtonGroup Class="ma-0 pa-0" Color="Color.Success" Variant="Variant.Filled">
+            <MudButton OnClick="AddNewAsync">
+                Add New @* @EntityName *@
+            </MudButton>
+        </MudButtonGroup>
+    </ToolBarContent>
+    <Columns>
+        @foreach (var prop in _properties)
+        {
+            var isVideo = prop.GetCustomAttribute<RenderAsAttribute>() != null;
+            var pKey = ReflectionHelper.GetDisplayName(prop).Equals("Nr");
+
+            <TemplateColumn Title="@ReflectionHelper.GetDisplayName(prop)">
+                <CellTemplate>
+                    <MudStack Row>
+                        @if (!isVideo && !pKey)
+                        {
+                            @ReflectionHelper.GetValue(context.Item, prop)
+                        }
+                        else if (!isVideo && pKey)
+                        {
+                            @(_gridData.IndexOf(context.Item) + 1)
+                        }
+                        else if (isVideo)
+                        {
+                            var url = @ReflectionHelper.GetValue(context.Item, prop)?.ToString();
+
+                            if (!string.IsNullOrWhiteSpace(url))
+                            {
+                                <MudLink Href="@ReflectionHelper.GetEmbeddedUrl(url)" Target="_blank">Link to video</MudLink>
+                            }
+                        }
+
+                    </MudStack>
+                </CellTemplate>
+            </TemplateColumn>
+
+        }
+        <TemplateColumn>
+            <CellTemplate>
+                <MudStack Row>
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" aria-label="delete" OnClick="@(() => DeleteItemAsync(context.Item))" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit" aria-label="edit" OnClick="@(() => NewUpdateItemAsync(_maxWidth,context.Item))" />
+                </MudStack>
+            </CellTemplate>
+        </TemplateColumn>
+    </Columns>
+    <PagerContent>
+        <MudDataGridPager T="TEntity" PageSizeOptions="new int[] {5,10,20,50}" />
+    </PagerContent>
+</MudDataGrid>
+
+@code {
+    [Parameter]
+    public string? EntityName { get; set; }
+    [Parameter]
+    public Func<Task<List<TEntity>>>? LoadData { get; set; }
+    [Parameter] 
+    public Func<int,Task<List<TGridEntity>>>? LoadGridData { get; set; }
+    [Parameter]
+    public Func<TGridEntity, Task<List<TGridEntityDetails>>>? LoadGridDetailData { get; set; }
+    [Parameter]
+    public Func<List<TGridEntityDetails>, Task<List<TGridEntityDetails>>>? NewDetailData { get; set; }
+    [Parameter]
+    public Func<List<TGridEntity>, List<TGridEntity>>? LoadNewGridData { get; set; }
+    [Parameter]
+    public Func<TGridEntity, List<TGridEntity>,Task<List<TGridEntity>>>? UpdateGridData { get; set; }
+    [Parameter]
+    public Func<Dictionary<object, List<WorkoutSetVM>> , object,int , WorkoutSetVM , Task<Dictionary<object, List<TGridEntityDetails>>>>? UpdateDetailslGrid { get; set; }
+    [Parameter]
+    public Func<TEntity, Task>? SaveHeaderData { get; set; }
+    [Parameter]
+    public Func<List<TGridEntity>,int, Task>? SaveDetailData { get; set; }
+    [Parameter]
+    public Func<Dictionary<object, List<TGridEntityDetails>>, Task>? SaveGridDetailData { get; set; }
+    [Parameter]
+    public string? GridEntityName { get; set; }
+    [Parameter]
+    public string? DetailName { get; set; }
+    [Parameter]
+    public bool DisplayAddEdit { get; set; }
+
+
+    private MudDataGrid<TEntity> _grid = default!;
+    private string? _searchString;
+    private List<TEntity> _gridData = new List<TEntity>();
+    private List<TGridEntity> _viewModelData = new List<TGridEntity>();
+    private readonly DialogOptions _maxWidth = new() { MaxWidth = MaxWidth.Medium, FullWidth = true };
+    private List<System.Reflection.PropertyInfo> _properties = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _gridData = LoadData != null ? await LoadData() : (await repo.GetAllAsync()).ToList();
+        _properties = typeof(TEntity)
+            .GetProperties()
+            .Where(p =>
+                (p.PropertyType.IsPrimitive
+                || p.PropertyType == typeof(string)
+                || p.PropertyType == typeof(DateTime)
+                || p.PropertyType.IsValueType)
+                &&
+                p.GetCustomAttribute<IgnoreInGridAttribute>() == null
+                || p.GetCustomAttribute<NavigationPropertyAttribute>() != null
+            )
+            .ToList();
+    }
+    private Func<TEntity, bool> _quickFilter => x =>
+    {
+        if (string.IsNullOrWhiteSpace(_searchString))
+            return true;
+
+        return _properties.Any(prop =>
+        {
+            var value = ReflectionHelper.GetValue(x, prop)?.ToString();
+
+            return !string.IsNullOrWhiteSpace(value)
+                && value.Contains(_searchString, StringComparison.OrdinalIgnoreCase);
+        });
+    };
+    private async Task NewUpdateItemAsync(DialogOptions options, TEntity? item)
+    {
+
+        if (LoadGridData != null && item != null)
+        {
+            var idProp = item.GetType().GetProperty("Id");
+
+            if (idProp != null)
+            {
+                var idValue = (int)idProp.GetValue(item);
+                _viewModelData = await LoadGridData(idValue);
+            }
+        }
+        var parameters = new DialogParameters
+        {
+            { "model", item } ,
+            { "viewModel",_viewModelData },
+            { "DetailName", DetailName },
+            { "NewDetailData", NewDetailData },
+            { "LoadGridDetailData", LoadGridDetailData },
+            { "LoadNewGridData" ,LoadNewGridData},
+            { "UpdateGridData" ,UpdateGridData},
+            { "DisplayAddEdit", DisplayAddEdit },
+            { "UpdateDetailslGrid", UpdateDetailslGrid },
+            { "SaveHeaderData",SaveHeaderData },
+            { "SaveDetailData", SaveDetailData },
+            { "SaveGridDetailData", SaveGridDetailData }
+        };
+        var dialog = await DialogService.ShowAsync<Upsert<TEntity, TGridEntity, TGridEntityDetails>>($"Add/Edit {EntityName}", parameters, options);
+
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            _gridData = (await repo.GetAllAsync()).ToList();
+
+            await _grid.ReloadServerData();
+            StateHasChanged();
+        }
+    }
+    private async Task DeleteItemAsync(TEntity? item)
+    {
+        System.Reflection.PropertyInfo idProperty;
+        int idValue;
+        var parameters = new DialogParameters<ConfirmDelete>
+        {
+            { x => x.ContentText, $"Do you really want to delete this {EntityName}? This process cannot be undone." },
+            { x => x.ButtonText, "Delete" },
+            { x => x.Color, Color.Error }
+        };
+
+        var options = new DialogOptions() { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
+
+        var dialog = await DialogService.ShowAsync<ConfirmDelete>("Delete", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            idProperty = _properties.FirstOrDefault(x => x.Name.Equals("Id"));
+            idValue = (int)ReflectionHelper.GetValue(item, idProperty);
+            await repo.DeleteAsync(idValue);
+            // reload list since the mudgrid data is bound to the _gridData list
+            _gridData = (await repo.GetAllAsync()).ToList();
+            await _grid.ReloadServerData();
+            StateHasChanged();
+        }
+    }
+    private async Task AddNewAsync()
+    {
+        var newItem = Activator.CreateInstance<TEntity>();
+        await NewUpdateItemAsync(_maxWidth, newItem);
+    }
+}

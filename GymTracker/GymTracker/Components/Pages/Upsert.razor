@@ -1,0 +1,612 @@
+﻿@page "/upsert"
+@using System.Net.Http.Json
+@using GymTrackerBusinessService.Generic
+@using GymTrackerDataModel.Models
+@using System.Linq.Expressions;
+@using System.Reflection;
+@using System.ComponentModel;
+@using System.ComponentModel.DataAnnotations;
+@using GymTrackerHelpers
+@using System.Collections;
+@typeparam TEntity
+@typeparam TGridEntity
+@typeparam TGridEntityDetails
+@inject IGenericRepoService<TEntity> repo
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager NavigationManager
+@inject IServiceProvider ServiceProvider
+
+<MudDialog>
+    <DialogContent>
+        <MudForm Model="@model" @ref="@form" ValidationDelay="0">
+            <MudCardContent Class="pa-6">
+                <MudStack Spacing="4">
+                    @foreach (var prop in _cardproperties)
+                    {
+                        var isNav = prop.GetCustomAttribute<NavigationPropertyAttribute>() != null;
+                        var isKey = prop.GetCustomAttribute<KeyAttribute>() != null;
+                        var type = prop.PropertyType;
+                        if (!isNav)
+                        {
+                            if (isKey)                            
+                            {
+                                <MudTextField T="int"
+                                              Value="@(GetValue(prop) is int i ? i : 0)"
+                                              ValueChanged="@(v => SetCardValue(prop, v))"
+                                              For="@( (Expression<Func<int>>)ReflectionHelper.GetExpression(prop, model!) )"
+                                              Label="@ReflectionHelper.GetDisplayName(prop)"
+                                              ReadOnly="true"
+                                              Variant="Variant.Outlined"
+                                              FullWidth="true"
+                                              Margin="Margin.Dense" />
+                            }
+                            else
+                            {
+
+                                if (type == typeof(string))
+                                {
+
+                                    <MudTextField T="string"
+                                                  Value="@(GetValue(prop)?.ToString() ?? "")"
+                                                  ValueChanged="@(v => SetCardValue(prop, v))"
+                                                  For="@( (Expression<Func<string>>)ReflectionHelper.GetExpression(prop, model!) )"
+                                                  Label="@ReflectionHelper.GetDisplayName(prop)"
+                                                  Immediate="true"
+                                                  MaxLines="10"
+                                                  Sizing="InputSizing.Auto"
+                                                  Variant="Variant.Outlined"
+                                                  FullWidth="true"
+                                                  Margin="Margin.Dense" />
+                                }
+                                else if (type == typeof(int))
+                                {
+                                    <MudNumericField T="int"
+                                                     Value="@(GetValue(prop) is int i ? i : 0)"
+                                                     ValueChanged="@(v => SetCardValue(prop, v))"
+                                                     For="@( (Expression<Func<int>>)ReflectionHelper.GetExpression(prop, model!) )"
+                                                     Label="@ReflectionHelper.GetDisplayName(prop)"
+                                                     Variant="Variant.Outlined"
+                                                     FullWidth="true"
+                                                     Margin="Margin.Dense" />
+                                }
+                                else if (type == typeof(DateTime))
+                                {
+                                    <MudDatePicker T="DateTime"
+                                                   Date="@(GetValue(prop) as DateTime?)"
+                                                   DateChanged="@(v => SetCardValue(prop, v))"
+                                                   Label="@ReflectionHelper.GetDisplayName(prop)"
+                                                   Variant="Variant.Outlined"
+                                                   Margin="Margin.Dense"
+                                                   Class="w-100" />
+                                }
+                                else if (type == typeof(DayOfWeek))
+                                {
+                                    <MudSelect T="DayOfWeek"
+                                               Variant="Variant.Outlined"
+                                               Label="@ReflectionHelper.GetDisplayName(prop)"
+                                               ValueChanged="@(v => SetCardValue(prop, v))"
+                                               FullWidth="true"
+                                               Margin="Margin.Dense"
+                                               Value="@(GetValue(prop) is DayOfWeek i? (i==0 ? DayOfWeek.Monday:i) : DayOfWeek.Monday)">
+                                        @foreach (var day in Enum.GetValues<DayOfWeek>())
+                                        {
+                                            <MudSelectItem Value="@day">@day</MudSelectItem>
+                                        }
+                                    </MudSelect>
+                                }
+                            }
+                        }
+                        else
+                        {
+                            var fkProp = ReflectionHelper.GetForeignKey<TEntity>(prop);
+                            var items = _navData.ContainsKey(prop.Name) ? _navData[prop.Name] : Enumerable.Empty<object>();
+
+                            <MudSelect T="int"
+                                       Value="@(GetValue(fkProp) is int i ? (i==0 ? 1:i) : 1)"
+                                       ValueChanged="@(v => SetCardValue(fkProp, v))"
+                                       Variant="Variant.Outlined"
+                                       Label="@ReflectionHelper.GetDisplayName(prop)"
+                                       FullWidth="true"
+                                       Margin="Margin.Dense">
+
+                                @foreach (var item in items)
+                                {
+                                    var id = (int)item.GetType().GetProperty("Id")!.GetValue(item)!;
+                                    var displayProp = item.GetType().GetProperty("Description")
+                                    ?? item.GetType().GetProperty("Name");
+
+                                    var text = displayProp?.GetValue(item)?.ToString();
+
+                                    <MudSelectItem Value="@id">@text</MudSelectItem>
+                                }
+                            </MudSelect>
+                        }
+                    }
+                </MudStack>
+            </MudCardContent>
+            @if (DisplayAddEdit)
+            {
+                 <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-3">
+                     <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="@(() => NewGridEntityAsync(viewModel))"> 
+                    Add @DetailName and it's details
+                </MudButton> 
+            </MudStack>
+            }
+            @if (viewModel is not null && viewModel.Count > 0)
+            {
+                <MudPaper Outlined="true" Class="pa-4 mt-4">
+                    <MudDataGrid T="TGridEntity"
+                                 @ref="_grid"
+                                 Items="@viewModel"
+                                 ReadOnly="false"
+                                 Bordered="true"
+                                 Dense="true"
+                                 Class="upsert-detail-grid">
+
+                        <Columns>
+                            <HierarchyColumn T="TGridEntity" HeaderStyle="width:56px;" />
+
+                            @foreach (var prop in _gridHeaderproperties)
+                            {
+                                var isDetail = prop.GetCustomAttribute<DetailPropertyAttribute>() != null;
+                                var isNavigation = prop.GetCustomAttribute<NavigationPropertyAttribute>() != null;
+                                var type = prop.PropertyType;
+                                <TemplateColumn Title="@ReflectionHelper.GetDisplayName(prop)">
+                                    <CellTemplate Context="cell">
+                                        @if (!isDetail)
+                                        {
+                                             @if (isNavigation)
+                                            {
+                                                var fkProp = ReflectionHelper.GetForeignKeyGrid<TGridEntity>(prop);
+
+                                                <MudAutocomplete T="int"
+                                                                 Value="@(FormatGridValue(cell.Item,fkProp) is int i ? i : 0)"
+                                                                 ValueChanged="@(v => SetNewDropDownValue(fkProp, v,cell.Item))"
+                                                                 Label="@ReflectionHelper.GetDisplayName(prop)"
+                                                                 Variant="Variant.Outlined"
+                                                                 FullWidth="true"
+                                                                 Margin="Margin.Dense"
+                                                                 SearchFunc="@( (value, token) => SearchNavData(prop, value, token) )"
+                                                                 ToStringFunc="@(id => GetDisplayText(prop.Name, id))"
+                                                                 Clearable="true"
+                                                                 MinCharacters="0"
+                                                                 OpenOnFocus="true"
+                                                                 AdornmentIcon="@Icons.Material.Filled.Search" />
+                                            }
+                                            else if (prop.PropertyType == typeof(string) && !isNavigation)
+                                            {
+                                                <MudTextField T="string"
+                                                              Value="@(@FormatGridValue(cell.Item, prop) is string i ? i : "" )"
+                                                              ValueChanged="@(v => SetGridValue(prop, v,cell.Item))"
+                                                              For="@( (Expression<Func<string>>)ReflectionHelper.GetExpression(prop, cell.Item!) )"
+                                                              Label="@ReflectionHelper.GetDisplayName(prop)"
+                                                              Variant="Variant.Outlined"
+                                                              FullWidth="true"
+                                                              Margin="Margin.Dense" />
+                                            }
+                                            else if (prop.PropertyType == typeof(int) && !isNavigation)
+                                            {
+                                                <MudNumericField T="int"
+                                                                 Value="@(@FormatGridValue(cell.Item, prop) is int i ? i:0 )"
+                                                                 ValueChanged="@(v => SetGridValue(prop, v,cell.Item))"
+                                                                 For="@((Expression<Func<int>>)ReflectionHelper.GetExpression(prop, cell.Item!) )"
+                                                                 Label="@ReflectionHelper.GetDisplayName(prop)"
+                                                                 Variant="Variant.Outlined"
+                                                                 FullWidth="true"
+                                                                 Margin="Margin.Dense" />
+                                            }  
+                                        }
+                                    </CellTemplate>
+                                </TemplateColumn>
+                            }
+
+                            <TemplateColumn>
+                                <CellTemplate Context="cell">
+                                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" OnClick="@(() => RemoveHeader(cell.Item))" />
+                                </CellTemplate>
+                            </TemplateColumn>
+
+                        </Columns>
+                        <ChildRowContent Context="cell">
+                            <MudPaper Outlined="true" Class="pa-4 mx-2 my-3">
+                                <MudStack Spacing="3">
+                                    @{
+                                        var details = _detailCache.ContainsKey(cell.Item)
+                                        ? _detailCache[cell.Item]
+                                        : new List<TGridEntityDetails>();
+                                    }
+
+                                    @if (details != null)
+                                    {
+                                        foreach (var detail in details)
+                                        {                                            
+                                            <MudPaper Elevation="0" Outlined="true" Class="pa-3">
+                                                <MudStack Spacing="3">
+                                                    <MudGrid Spacing="3" AlignItems="AlignItems.Stretch">
+                                                        <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+                                                        @foreach (var prop in _viewModelDetails)
+                                                        {
+                                                            var value = prop.GetValue(detail);
+                                                            var isNavigation = prop.GetCustomAttribute<NavigationPropertyAttribute>() != null;
+                                                            var collection = prop.GetCustomAttribute<CollectionAttribute>() != null;
+                                                            if (collection && value is IEnumerable enumerable)
+                                                            {
+                                                                    int iter = 0;
+                                                                    @foreach (var item in enumerable)
+                                                                    {
+                                                                        var currentIndex = iter;
+                                                                        var properties = item.GetType().GetProperties()
+                                                                        .Where(p => p.GetCustomAttribute<IgnoreInGridAttribute>() == null)
+                                                                        .ToList();
+                                                                        foreach (var itemProp in properties)
+                                                                        {
+                                                                            var isDetailNav = itemProp.GetCustomAttribute<NavigationPropertyAttribute>() != null;
+                                                                            var itemPropVal = itemProp.GetValue(item);
+                                                                            if (isDetailNav)
+                                                                            {
+                                                                                var fkProp = ReflectionHelper.GetForeignKeyGrid(itemProp);
+                                                                                <MudAutocomplete T="int"
+                                                                                                 Value="@(@FormatDetailGridValue(item, fkProp) is int i ? i : 0)"
+                                                                                                 ValueChanged="@(v => SetNewDropDetailDownValue(fkProp, v,currentIndex,detail))"
+                                                                                                 Label="@ReflectionHelper.GetDisplayName(itemProp)"
+                                                                                                 Variant="Variant.Outlined"
+                                                                                                 FullWidth="true"
+                                                                                                 Margin="Margin.Dense"
+                                                                                                 SearchFunc="@( (value, token) => SearchNavData(itemProp, value, token) )"
+                                                                                                 ToStringFunc="@(id => GetDisplayText(itemProp.Name, id))"
+                                                                                                 Clearable="true"
+                                                                                                 MinCharacters="0"
+                                                                                                 OpenOnFocus="true"
+                                                                                AdornmentIcon="@Icons.Material.Filled.Search" />
+                                                                            }
+                                                                            if (itemProp.PropertyType == typeof(decimal?))
+                                                                            {
+                                                                                if (itemPropVal != null)
+                                                                                {
+                                                                                    <MudNumericField T="decimal"
+                                                                                    Value="@(itemPropVal is decimal i ? i : 0)"
+                                                                                    ValueChanged="@(v => itemProp.SetValue(item, v))"
+                                                                                    Variant="Variant.Outlined"
+                                                                                    FullWidth="true"
+                                                                                    Margin="Margin.Dense" />
+                                                                                }
+                                                                            }
+                                                                            else if (itemProp.PropertyType == typeof(string))
+                                                                            {
+                                                                                if (!string.IsNullOrEmpty(itemPropVal?.ToString()))
+                                                                                {
+                                                                                    <MudTextField T="string"
+                                                                                                  Value="@(itemPropVal?.ToString() ?? "")"
+                                                                                                  ValueChanged="@(v => itemProp.SetValue(item, v))"
+                                                                                                  Variant="Variant.Outlined"
+                                                                                                  FullWidth="true"
+                                                                                    Margin="Margin.Dense" />
+                                                                                }
+
+                                                                            }
+                                                                        }
+                                                                        iter++;
+                                                                    }
+                                                                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" OnClick="@(() => RemoveDetails(details, detail))" />
+
+                                                                } 
+                                                            else 
+                                                            {
+                                                                var fkProp = ReflectionHelper.GetForeignKeyGrid(prop);
+                                                                <MudItem xs="12" sm="6" md="4" Class="d-flex">
+                                                                        <MudStack Spacing="1" Class="w-100">
+                                                                            <ManageGridDetails isNavigation="@isNavigation"
+                                                                                               prop="@prop"
+                                                                                               FormatDetailGridValue="@FormatDetailGridValue"
+                                                                                               Detail="@detail"
+                                                                                               SearchNavData="@SearchNavData"
+                                                                                               FormatDetailValue="@FormatDetailValue" />
+
+                                                                    </MudStack>
+                                                                </MudItem>
+                                                            }
+                                                        }
+                                                        </MudStack>
+                                                    </MudGrid>
+                                                </MudStack>
+                                            </MudPaper>
+                                        }
+                                        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.End">
+                                            <MudIconButton Icon="@Icons.Material.Filled.AddComment" Color="Color.Primary" Size="Size.Small" OnClick="@(() => NewDetailAsync(cell.Item))" />
+                                        </MudStack>
+                                    }
+                                    else
+                                    {
+                                        <MudText Typo="Typo.body2" Color="Color.Secondary">No detail records are available for this row.</MudText>
+                                    }
+                                </MudStack>
+                            </MudPaper>
+                        </ChildRowContent>
+                    </MudDataGrid>
+                </MudPaper>
+            }
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Text" Color="Color.Default" OnClick="Cancel">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="ml-auto" OnClick="@(async () => await Submit())">Submit</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [Inject] ISnackbar? Snackbar { get; set; }
+    MudForm? form;
+
+    private List<System.Reflection.PropertyInfo> _cardproperties = new();
+    private List<System.Reflection.PropertyInfo> _gridHeaderproperties = new();
+    private List<System.Reflection.PropertyInfo> _viewModelDetails = new();
+
+    [CascadingParameter]
+    private IMudDialogInstance? MudDialog { get; set; }
+    [Parameter]
+    public TEntity? model { get; set; }
+    [Parameter]
+    public List<TGridEntity>? viewModel { get; set; }
+    [Parameter]
+    public string? DetailName { get; set; }
+    [Parameter]
+    public Func<TGridEntity, Task<List<TGridEntityDetails>>>? LoadGridDetailData { get; set; }
+    [Parameter]
+    public Func<List<TGridEntityDetails>, Task<List<TGridEntityDetails>>>? NewDetailData { get; set; }
+    [Parameter]
+    public Func<List<TGridEntity>, List<TGridEntity>>? LoadNewGridData { get; set; }
+    [Parameter]
+    public Func<TGridEntity, List<TGridEntity>,Task<List<TGridEntity>>>? UpdateGridData { get; set; }
+    [Parameter]
+    public Func<Dictionary<object, List<TGridEntityDetails>>, object,int,TGridEntityDetails, Task<Dictionary<object, List<TGridEntityDetails>>>>? UpdateDetailslGrid { get; set; }
+    [Parameter]
+    public Func<TEntity, Task>? SaveHeaderData { get; set; }
+    [Parameter]
+    public Func<List<TGridEntity>, int, Task>? SaveDetailData { get; set; }
+    [Parameter]
+    public Func<Dictionary<object, List<TGridEntityDetails>>, Task>? SaveGridDetailData { get; set; }
+    [Parameter]
+    public bool DisplayAddEdit { get; set; }
+
+    private Dictionary<object, List<TGridEntityDetails>> _detailCache = new();
+
+    private Dictionary<string, IEnumerable<object>> _navData = new();
+    private MudDataGrid<TGridEntity> _grid = default!;
+    private List<TGridEntity>? viewModelHeader { get; set; }
+    private Type _detailType { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        model ??= Activator.CreateInstance<TEntity>();
+        viewModel ??= Activator.CreateInstance<List<TGridEntity>>();
+
+        _cardproperties = typeof(TEntity)
+        .GetProperties()
+        .Where(p =>
+        (p.PropertyType.IsPrimitive
+        || p.PropertyType == typeof(string)
+        || p.PropertyType == typeof(DateTime)
+        || p.PropertyType.IsValueType)
+        &&
+        p.GetCustomAttribute<IgnoreInGridAttribute>() == null
+        || p.GetCustomAttribute<NavigationPropertyAttribute>() != null
+        )
+        .ToList();
+
+        GetViewModelProperties();
+        foreach (var prop in _viewModelDetails.Where(p => p.GetCustomAttribute<NavigationPropertyAttribute>() != null))
+        {
+            var data = await ReflectionHelper.GetNavigationData(prop, ServiceProvider);
+            _navData[prop.Name] = data;
+        }
+        foreach (var collectionProp in _viewModelDetails.Where(p => p.GetCustomAttribute<CollectionAttribute>() != null))
+        {
+            var itemType = collectionProp.PropertyType.GetGenericArguments().First();
+
+            var navProps = itemType.GetProperties()
+                .Where(p => p.GetCustomAttribute<NavigationPropertyAttribute>() != null);
+
+            foreach (var navProp in navProps)
+            {
+                var data = await ReflectionHelper.GetNavigationData(navProp, ServiceProvider);
+
+                _navData[navProp.Name] = data;
+            }
+        }
+
+        //🔥 Load navigation data here
+        foreach (var prop in _cardproperties.Where(p => p.GetCustomAttribute<NavigationPropertyAttribute>() != null))
+        {
+            var data = await ReflectionHelper.GetNavigationData(prop, ServiceProvider);
+            _navData[prop.Name] = data;
+
+            var fkProp = ReflectionHelper.GetForeignKey<TEntity>(prop);
+            // 🔥 Set default value if it's 0
+            var currentValue = (int?)fkProp?.GetValue(model) ?? 0;
+            if (currentValue == 0 && data.Any())
+            {
+                var firstItem = data.First();
+                var id = (int)firstItem.GetType().GetProperty("Id")!.GetValue(firstItem)!;
+                fkProp?.SetValue(model, id);
+            }
+        }
+
+        foreach (var prop in _gridHeaderproperties.Where(p => p.GetCustomAttribute<NavigationPropertyAttribute>() != null))
+        {
+            var data = await ReflectionHelper.GetNavigationData(prop, ServiceProvider);
+            _navData[prop.Name] = data;
+        }
+
+        foreach (var item in viewModel)
+        {
+            if (LoadGridDetailData != null)
+            {
+                _detailCache[item] = await LoadGridDetailData(item);
+            }
+        }
+    }
+    private void Cancel() => MudDialog.Cancel();
+    private async Task Submit()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        var userName = user.Identity?.Name ?? "system";
+        var now = DateTime.Now;
+        int id;
+        await form.ValidateAsync();
+
+        if (form.IsValid)
+        {
+            await SaveHeaderData(model);
+            id = (int)(typeof(TEntity).GetProperty("Id")?.GetValue(model) ?? 0);
+            SaveDetailData ??= (_, _) => Task.CompletedTask;
+            await SaveDetailData(viewModel, id);
+            SaveGridDetailData ??= (_) => Task.CompletedTask;
+            await SaveGridDetailData(_detailCache);
+            
+            MudDialog.Close(DialogResult.Ok(model));
+        }
+    }
+    private object? GetValue(PropertyInfo prop)
+    {
+        return prop.GetValue(model);
+    }
+    private void SetCardValue(PropertyInfo prop, object? value)
+    {
+        prop.SetValue(model, value);
+    }
+    private void SetGridValue(PropertyInfo prop, object? value, TGridEntity item)
+    {
+        prop.SetValue(item, value);
+    }
+    private async Task SetNewDropDownValue(PropertyInfo prop, object? value,TGridEntity item)
+    {       
+        if (prop.GetValue(item) != null)
+        {
+            prop.SetValue(item, value);
+        }
+        viewModel = await UpdateGridData(item, viewModel);
+
+        StateHasChanged();
+    }
+    private async Task SetNewDropDetailDownValue(PropertyInfo prop, object? value,int index, TGridEntityDetails item)
+    {
+        _detailCache = await UpdateDetailslGrid(_detailCache, value, index, item);
+        StateHasChanged();
+    }
+    private object FormatGridValue(TGridEntity item, PropertyInfo prop)
+    {
+        var value = prop.GetValue(item);
+
+        if (value is DateTime dt)
+            return dt.ToString("yyyy-MM-dd");
+
+        return value ?? null;
+    }
+    private object FormatDetailGridValue(object item, PropertyInfo prop)
+    {
+        var value = prop.GetValue(item);
+        return value ?? null;
+    }
+    private string FormatDetailValue(object item, PropertyInfo prop)
+    {
+        var value = prop.GetValue(item);
+
+        if (value is DateTime dt)
+            return dt.ToString("yyyy-MM-dd");
+
+        return value?.ToString() ?? string.Empty;
+    }
+    private void RemoveDetail(TGridEntity parent, object detail)
+    {
+        var detailsProp = typeof(TGridEntity).GetProperty("Details");
+
+        var list = detailsProp?.GetValue(parent) as IList;
+
+        if (list != null && list.Contains(detail))
+        {
+            list.Remove(detail);
+        }
+    }
+    private void RemoveDetails(List<TGridEntityDetails> list, TGridEntityDetails remove)
+    {
+        list.Remove(remove);
+    }
+    private void RemoveHeader(TGridEntity item)
+    {
+        viewModel.Remove(item);
+    }
+    private async Task NewDetailAsync(TGridEntity parent)
+    {
+        var details = _detailCache[parent];
+        details = await NewDetailData(details);
+
+    }
+    private async Task NewGridEntityAsync(List<TGridEntity> parent)
+    {
+        viewModel = LoadNewGridData(parent);
+        _detailCache[viewModel.Last()] = await LoadGridDetailData(viewModel.Last());
+        GetViewModelProperties();
+    }
+    private void GetViewModelProperties()
+    {
+        _gridHeaderproperties = typeof(TGridEntity)
+        .GetProperties()
+        .Where(p =>
+        (p.PropertyType.IsPrimitive
+        || p.PropertyType == typeof(string)
+        || p.PropertyType == typeof(DateTime)
+        || p.PropertyType.IsValueType)
+        &&
+        p.GetCustomAttribute<IgnoreInGridAttribute>() == null
+        || p.GetCustomAttribute<NavigationPropertyAttribute>() != null
+        )
+        .ToList();
+
+        _viewModelDetails = typeof(TGridEntityDetails)
+        .GetProperties()
+        .Where(p => p.GetCustomAttribute<IgnoreInGridAttribute>() == null
+        || p.GetCustomAttribute<CollectionAttribute>() != null)
+        .ToList();
+
+    }
+    private async Task<IEnumerable<int>> SearchNavData(PropertyInfo prop, string value, CancellationToken token)
+    {
+        var items = await ReflectionHelper.GetNavigationData(prop, ServiceProvider);
+        IEnumerable<int> result = null;
+        if (!string.IsNullOrEmpty(value))
+        {
+            result = items
+               .Where(x =>
+               {
+                   var text = GetDisplayProperty(x)?.ToLower();
+                   return string.IsNullOrWhiteSpace(value) || text.Contains(value.ToLower());
+               })
+               .Select(x => (int)x.GetType().GetProperty("Id")!.GetValue(x)!);
+        }
+        else
+        {
+            result = items.Select(x => (int)x.GetType().GetProperty("Id")!.GetValue(x)!);
+        }
+
+        return await Task.FromResult(result);
+    }
+    private string GetDisplayText(string propName, int id)
+    {
+        var items = _navData.ContainsKey(propName)
+            ? _navData[propName]
+            : Enumerable.Empty<object>();
+
+        var item = items.FirstOrDefault(x =>
+            (int)x.GetType().GetProperty("Id")!.GetValue(x)! == id);
+
+        return item != null ? GetDisplayProperty(item) : "";
+    }
+    private string GetDisplayProperty(object item)
+    {
+        var prop = item.GetType().GetProperty("Description")
+               ?? item.GetType().GetProperty("Name");
+
+        return prop?.GetValue(item)?.ToString() ?? "";
+    }
+}

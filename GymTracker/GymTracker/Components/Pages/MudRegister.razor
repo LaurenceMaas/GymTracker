@@ -1,0 +1,155 @@
+@page "/mudregister"
+
+@using System.ComponentModel.DataAnnotations
+@using System.Text
+@using System.Text.Encodings.Web
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.AspNetCore.WebUtilities
+@using GymTracker.Data
+@using GymTracker.Components.Account
+
+@inject UserManager<ApplicationUser> UserManager
+@inject IUserStore<ApplicationUser> UserStore
+@inject SignInManager<ApplicationUser> SignInManager
+@inject IEmailSender<ApplicationUser> EmailSender
+@inject ILogger<MudRegister> Logger
+@inject NavigationManager NavigationManager
+@inject IdentityRedirectManager RedirectManager
+
+<PageTitle>Register</PageTitle>
+
+<MudGrid Justify="Justify.Center" Class="mt-6" xs="12">
+    <MudItem xs="12" sm="8" md="6" lg="4" Class="d-flex justify-center">
+        <MudPaper Class="pa-4 w-100" Style="max-width: 480px;">
+            
+            <EditForm Model="Input" asp-route-returnUrl="@ReturnUrl" method="post" OnValidSubmit="RegisterUser" FormName="mud-register">
+                <DataAnnotationsValidator />
+                <MudText Typo="Typo.h5">Create a new account</MudText>
+                <ValidationSummary class="text-danger" />
+
+                <MudTextField T="string"
+                              Label="Email"
+                              @bind-Value="Input.Email"
+                              InputType="InputType.Email"
+                              Required="true"
+                              For="() => Input.Email"
+                              RequiredError="Email is required" />
+                <MudTextField T="string"
+                              Label="Password"
+                              @bind-Value="Input.Password"
+                              InputType="InputType.Password"
+                              For="() => Input.Password"
+                              Required="true"
+                              RequiredError="Password is required" />
+                <MudTextField T="string"
+                              Label="Confirm Password"
+                              @bind-Value="Input.ConfirmPassword"
+                              InputType="InputType.Password"
+                              For="() => Input.ConfirmPassword"
+                              Required="true"
+                              RequiredError="Confirm password is required" />
+
+                <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary" Class="mt-3">
+                    Register
+                </MudButton>
+                <MudField Variant="Variant.Text">@Message</MudField>
+            </EditForm>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private IEnumerable<IdentityError>? identityErrors;
+
+    [SupplyParameterFromForm]
+    private InputModel Input { get; set; } = new();
+
+    [SupplyParameterFromQuery]
+    private string? ReturnUrl { get; set; }
+
+    private string? Message => identityErrors is null ? null : $"Error: {string.Join(", ", identityErrors.Select(error => error.Description))}";
+
+    public async Task RegisterUser(EditContext editContext)
+    {
+        var user = CreateUser();
+
+        await UserStore.SetUserNameAsync(user, Input.Email, CancellationToken.None);
+        var emailStore = GetEmailStore();
+        await emailStore.SetEmailAsync(user, Input.Email, CancellationToken.None);
+        var result = await UserManager.CreateAsync(user, Input.Password);
+
+        if (!result.Succeeded)
+        {
+            identityErrors = result.Errors;
+            return;
+        }
+
+        Logger.LogInformation("User created a new account with password.");
+
+        var userId = await UserManager.GetUserIdAsync(user);
+        var code = await UserManager.GenerateEmailConfirmationTokenAsync(user);
+        code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
+        var confirmEmailUrl = new Uri(new Uri(NavigationManager.BaseUri), "MudConfirmEmail").AbsoluteUri;
+        var callbackUrl = NavigationManager.GetUriWithQueryParameters(
+           confirmEmailUrl,
+            new Dictionary<string, object?>
+            {
+                ["userId"] = userId,
+                ["code"] = code,
+                ["returnUrl"] = ReturnUrl
+            });
+
+        await EmailSender.SendConfirmationLinkAsync(user, Input.Email, callbackUrl);
+        var destination = NavigationManager.GetUriWithQueryParameters(
+            NavigationManager.ToAbsoluteUri("MudRegisterConfirmation").GetLeftPart(UriPartial.Path),
+            new Dictionary<string, object?>
+            {
+                ["email"] = Input.Email,
+                ["returnUrl"] = ReturnUrl ?? "/"
+            });
+
+        NavigationManager.NavigateTo(destination, forceLoad: true);
+    }
+
+    private ApplicationUser CreateUser()
+    {
+        try
+        {
+            return Activator.CreateInstance<ApplicationUser>();
+        }
+        catch
+        {
+            throw new InvalidOperationException($"Can't create an instance of '{nameof(ApplicationUser)}'. " +
+                $"Ensure that '{nameof(ApplicationUser)}' is not an abstract class and has a parameterless constructor.");
+        }
+    }
+
+    private IUserEmailStore<ApplicationUser> GetEmailStore()
+    {
+        if (!UserManager.SupportsUserEmail)
+        {
+            throw new NotSupportedException("The default UI requires a user store with email support.");
+        }
+        return (IUserEmailStore<ApplicationUser>)UserStore;
+    }
+
+    private sealed class InputModel
+    {
+        [Required]
+        [EmailAddress]
+        [Display(Name = "Email")]
+        public string Email { get; set; } = "";
+
+        [Required]
+        [StringLength(100, ErrorMessage = "The {0} must be at least {2} and at max {1} characters long.", MinimumLength = 6)]
+        [DataType(DataType.Password)]
+        [Display(Name = "Password")]
+        public string Password { get; set; } = "";
+
+        [DataType(DataType.Password)]
+        [Display(Name = "Confirm password")]
+        [Compare("Password", ErrorMessage = "The password and confirmation password do not match.")]
+        public string ConfirmPassword { get; set; } = "";
+    }
+}

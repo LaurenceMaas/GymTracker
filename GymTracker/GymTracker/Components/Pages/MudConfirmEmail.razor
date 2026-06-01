@@ -1,0 +1,113 @@
+@page "/MudConfirmEmail"
+
+@using System.Text
+@using System.Linq
+@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.AspNetCore.WebUtilities
+@using GymTracker.Data
+@using MudBlazor
+
+@inject UserManager<ApplicationUser> UserManager
+@inject NavigationManager NavigationManager
+@inject ILogger<MudConfirmEmail> Logger
+
+<PageTitle>Confirm email</PageTitle>
+
+<MudGrid Justify="Justify.Center" Class="mt-8" xs="12">
+    <MudItem xs="12" sm="8" md="6" lg="4">
+        <MudPaper Class="pa-6">
+            <MudText Typo="Typo.h5" Class="mb-3">Email confirmation</MudText>
+
+            @if (isProcessing)
+            {
+                <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-3" />
+                <MudText Typo="Typo.body1">@message</MudText>
+            }
+            else
+            {
+                <MudAlert Severity="@(success ? Severity.Success : Severity.Error)" Variant="Variant.Filled" Class="mb-3">
+                    @message
+                </MudAlert>
+
+                <MudStack Row="true" Spacing="2">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="GoHome">Go to home</MudButton>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="GoLogin">Go to login</MudButton>
+                </MudStack>
+            }
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "userId")]
+    public string? UserId { get; set; }
+
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "code")]
+    public string? Code { get; set; }
+
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "returnUrl")]
+    public string? ReturnUrl { get; set; }
+
+    private bool success;
+    private bool isProcessing = true;
+    private string message = "Confirming your email...";
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Manual query parse fallback to avoid missing params
+        var uri = NavigationManager.ToAbsoluteUri(NavigationManager.Uri);
+        var query = QueryHelpers.ParseQuery(uri.Query);
+        if (string.IsNullOrEmpty(UserId) && query.TryGetValue("userId", out var userIdFromQuery))
+        {
+            UserId = userIdFromQuery;
+        }
+        if (string.IsNullOrEmpty(Code) && query.TryGetValue("code", out var codeFromQuery))
+        {
+            Code = codeFromQuery;
+        }
+        if (string.IsNullOrEmpty(ReturnUrl) && query.TryGetValue("returnUrl", out var returnUrlFromQuery))
+        {
+            ReturnUrl = returnUrlFromQuery;
+        }
+
+        if (string.IsNullOrEmpty(UserId) || string.IsNullOrEmpty(Code))
+        {
+            message = "Invalid confirmation link.";
+            isProcessing = false;
+            return;
+        }
+
+        try
+        {
+            var decodedCode = Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(Code));
+            var user = await UserManager.FindByIdAsync(UserId);
+            if (user is null)
+            {
+                message = $"Unable to find user with Id '{UserId}'.";
+            }
+            else
+            {
+                var result = await UserManager.ConfirmEmailAsync(user, decodedCode);
+                success = result.Succeeded;
+                message = result.Succeeded
+                    ? "Thank you for confirming your email."
+                    : $"Error confirming your email: {string.Join(", ", result.Errors.Select(e => e.Description))}";
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error confirming email for user {UserId}", UserId);
+            message = "An unexpected error occurred while confirming your email.";
+        }
+
+        isProcessing = false;
+    }
+
+    private void GoHome() => NavigationManager.NavigateTo(ReturnUrl ?? "/");
+
+    private void GoLogin() => NavigationManager.NavigateTo("/Account/Login");
+}

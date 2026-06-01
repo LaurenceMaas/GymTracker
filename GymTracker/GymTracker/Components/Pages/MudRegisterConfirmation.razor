@@ -1,0 +1,43 @@
+@page "/MudRegisterConfirmation"
+
+@inject NavigationManager NavigationManager
+
+<PageTitle>Registration Confirmation</PageTitle>
+
+<MudGrid Class="mt-6" xs="12">
+    <MudItem xs="12" sm="8" smOffset="2">
+        <MudPaper Class="pa-6">
+            <MudStack Spacing="2">
+                <MudText Typo="Typo.h5" Color="Color.Primary">
+                    Check your email
+                </MudText>
+                <MudText Typo="Typo.body1">
+                    We sent a confirmation link to @Email. Follow the link to complete your registration.
+                </MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    If you don’t see the email, check your spam folder.
+                </MudText>
+                <MudStack Direction="Row" Spacing="2">
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               OnClick="@(() => NavigationManager.NavigateTo(ReturnUrl ?? "/"))">
+                        Go to site
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Secondary"
+                               OnClick="@(() => NavigationManager.NavigateTo("mudlogin"))">
+                        Back to login
+                    </MudButton>
+                </MudStack>
+            </MudStack>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    [SupplyParameterFromQuery]
+    public string? Email { get; set; }
+
+    [SupplyParameterFromQuery]
+    public string? ReturnUrl { get; set; }
+}

@@ -1,0 +1,73 @@
+@inject NavigationManager NavigationManager
+
+<MudNavMenu>
+
+     <AuthorizeView>
+        <Authorized>
+            <MudNavLink Icon="@Icons.Material.Filled.Home" Color="Color.Primary" class="nav-link" href="" Match="NavLinkMatch.All">
+                Home
+            </MudNavLink>
+            <MudNavLink Icon="@Icons.Material.Rounded.WorkOutline" class="nav-link" href="manage/templateworkout">
+                 Manage Workouts
+            </MudNavLink>
+            <MudNavLink Icon="@Icons.Material.Filled.SportsHandball" class="nav-link" href="manage/exercise">
+                Manage Exercises
+            </MudNavLink>
+            <MudNavLink Icon="@Icons.Material.Filled.ContentPasteGo" class="nav-link" href="manage/workoutschedule">
+                Manage Workout Schedule
+            </MudNavLink>
+            <MudNavLink Icon="@Icons.Material.Filled.VerifiedUser" class="nav-link" href="" Style="padding:0px;">
+                <span class="bi bi-person-fill-nav-menu" aria-hidden="true"></span> 
+                @context.User.Identity?.Name
+            </MudNavLink>
+            <form action="/api/logout" method="post">
+
+                <MudButton StartIcon="@Icons.Material.Filled.Logout"
+                           ButtonType="ButtonType.Submit"
+                           Color="Color.Inherit"
+                           Class="nav-link"
+                           Style="width:100%; justify-content:flex-start">
+                    Logout
+                </MudButton>
+            </form>
+        </Authorized>
+        <NotAuthorized>
+            <div class="nav-item px-3">
+                <MudNavLink Icon="@Icons.Material.Filled.AppRegistration" class="nav-link" href="mudregister">
+                    <span class="bi bi-person-nav-menu" aria-hidden="true"></span> Register
+                </MudNavLink>
+            </div>
+            <div class="nav-item px-3">
+                <MudNavLink Icon="@Icons.Material.Filled.Login" class="nav-link" href="mudlogin">
+                    <span class="bi bi-person-badge-nav-menu" aria-hidden="true"></span> Login
+                </MudNavLink>
+            </div>
+            <div class="nav-item px-3">
+                <MudNavLink Icon="@Icons.Material.Filled.Password" class="nav-link" href="mudforgotpassword">
+                    <span class="bi bi-person-badge-nav-menu" aria-hidden="true"></span> Forgot Password
+                </MudNavLink>
+            </div>
+        </NotAuthorized>
+    </AuthorizeView>
+</MudNavMenu>
+
+@code {
+    private string? currentUrl;
+
+    protected override void OnInitialized()
+    {
+        currentUrl = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
+        NavigationManager.LocationChanged += OnLocationChanged;
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        currentUrl = NavigationManager.ToBaseRelativePath(e.Location);
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        NavigationManager.LocationChanged -= OnLocationChanged;
+    }
+}
