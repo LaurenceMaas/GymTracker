@@ -36,7 +36,7 @@ namespace GymTrackerBusinessService.Repository
         Task<List<WorkoutGroupVM>> OnUpdateExerciseAsync(WorkoutGroupVM workoutGroupVMmod, List<WorkoutGroupVM> currentWorkoutGroupVMs);
         Task<Dictionary<object, List<WorkoutSetVM>>> OnUpdateDetailEntryAsync(Dictionary<object, List<WorkoutSetVM>> sets, object metricId, int index, WorkoutSetVM workoutSetVM);
         Task SaveWorkoutHeaderData(TemplateWorkout templateWorkout);
-        Task SaveWorkoutExerciseData(List<WorkoutGroupVM>? exerciseToSave, int workOutTemplateId);
+        Task<List<WorkoutGroupVM>> SaveWorkoutExerciseData(List<WorkoutGroupVM>? exerciseToSave, int workOutTemplateId);
         Task SaveExerciseSetsData(Dictionary<object, List<WorkoutSetVM>> data);
     }
     public class WorkoutGroupVM 
@@ -234,7 +234,7 @@ namespace GymTrackerBusinessService.Repository
                 await genericRepoService.UpdateAsync(templateWorkout);
             }
         }
-        public async Task SaveWorkoutExerciseData(List<WorkoutGroupVM>? exerciseToSave, int workOutTemplateId)
+        public async Task<List<WorkoutGroupVM>> SaveWorkoutExerciseData(List<WorkoutGroupVM>? exerciseToSave, int workOutTemplateId)
         {
             IEnumerable<int> OriginalItems;
             IEnumerable<int> IDs;
@@ -260,7 +260,7 @@ namespace GymTrackerBusinessService.Repository
                         WorkoutTemplateId = workOutTemplateId,
                         ExerciseId = workoutGroupVM.ExerciseId
                     };
-                    await genericRepoService.InsertAsync(templateExercise);
+                    workoutGroupVM.TemplateExerciseId = await genericRepoService.InsertAsync(templateExercise);
                 }
                 else
                 {
@@ -273,6 +273,8 @@ namespace GymTrackerBusinessService.Repository
                     await genericRepoService.UpdateAsync(templateExercise);
                 }
             }
+
+            return exerciseToSave;
         }
         public async Task SaveExerciseSetsData(Dictionary<object, List<WorkoutSetVM>> data)
         {
@@ -351,16 +353,6 @@ namespace GymTrackerBusinessService.Repository
 
                     }).ToList();
 
-                    //OriginalItems = tsmOrig.Select(x => x.Id);
-
-                    //metricIDs = workoutSetVM.WorkoutSetMetricVMs.Select(x => x.MetricId);
-                    //IDs = _tsmtable.Where(x=>x.TemplateSetId == tSet.Id).Select(x=>x.Id);
-                    //missingEntries = OriginalItems.Where(x => !IDs.Any(y => y == x));
-
-                    //foreach (int item in missingEntries)
-                    //{
-                    //    await tsmRepoService.DeleteAsync(item);
-                    //}
                     iter = 0;
                     foreach (WorkoutSetMetricVM wsm in workoutSetVM.WorkoutSetMetricVMs)
                     {
@@ -393,7 +385,6 @@ namespace GymTrackerBusinessService.Repository
                 }
             }
         }
-
         public async Task<Dictionary<object, List<WorkoutSetVM>>> OnUpdateDetailEntryAsync(Dictionary<object, List<WorkoutSetVM>> sets,object metricId,int index, WorkoutSetVM workoutSetVM)
         {
             List<WorkoutSetVM> value;
@@ -402,7 +393,7 @@ namespace GymTrackerBusinessService.Repository
             foreach (object key in sets.Keys)
             {
                value = sets[key];
-                set = value.FirstOrDefault(x => x.SetNumber == workoutSetVM.SetNumber && x.TemplateSetId == workoutSetVM.TemplateSetId);
+               set = value.FirstOrDefault(x => x.SetNumber == workoutSetVM.SetNumber && x.TemplateSetId == workoutSetVM.TemplateSetId);
                 
                 if (set != null)
                 {

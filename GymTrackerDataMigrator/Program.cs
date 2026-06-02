@@ -21,7 +21,7 @@ void CreateSeedData(EntityDBContext context)
         DbSet<ExerciseType> exerciseType = context.LKP_ExerciseType;
         exerciseType.AddRange(
         new ExerciseType { Description = "Aerobic" },
-        new ExerciseType { Description = "Resistance" }
+        new ExerciseType { Description = "Anaerobic" }
         );
         context.SaveChanges();
     }

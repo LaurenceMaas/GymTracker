@@ -27,8 +27,7 @@ namespace GymTrackerBusinessService.Repository
         {
             _optionsBuilder = Helpers.BuildOptions();
             IGenericRepoService<Exercise> genericRepoService = new GenericRepoService<Exercise>(new EntityDBContext(_optionsBuilder.Options));
-            IGenericRepoService<ExerciseType> extypeRepoService = new GenericRepoService<ExerciseType>(new EntityDBContext(_optionsBuilder.Options));
-            exercise.ExerciseType = await extypeRepoService.GetByIdAsync(exercise.ExerciseTypeId);
+            exercise.ExerciseType = null;
             if (exercise.Id == 0)
             {
                 await genericRepoService.InsertAsync(exercise);

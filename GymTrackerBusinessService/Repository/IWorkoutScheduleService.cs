@@ -25,7 +25,9 @@ namespace GymTrackerBusinessService.Repository
         {
             _optionsBuilder = Helpers.BuildOptions();
             IGenericRepoService<DOWWorkout> genericRepoService = new GenericRepoService<DOWWorkout>(new EntityDBContext(_optionsBuilder.Options));
-            return  (await genericRepoService.GetAllAsync()).ToList().FindAll(x=>x.UserId.ToString().Equals(UserId)).OrderBy(x=>x.DayOfWeek).OrderBy(x=>x.WorkoutPeriodId).ToList();
+            var result = (await genericRepoService.GetAllAsync()).ToList().FindAll(x => x.UserId.ToString().Equals(UserId))
+                .OrderBy(x => x.DayOfWeek).ToList();
+            return (await genericRepoService.GetAllAsync()).ToList().FindAll(x => x.UserId.ToString().Equals(UserId)).OrderBy(x => x.DayOfWeek).ToList();
         }
 
         public async Task SaveWorkoutScheduleData(DOWWorkout dowWorkout, string userId)
@@ -33,11 +35,9 @@ namespace GymTrackerBusinessService.Repository
 
             _optionsBuilder = Helpers.BuildOptions();
             IGenericRepoService<DOWWorkout> genericRepoService = new GenericRepoService<DOWWorkout>(new EntityDBContext(_optionsBuilder.Options));
-            IGenericRepoService<WorkoutPeriod> wpRepoService = new GenericRepoService<WorkoutPeriod>(new EntityDBContext(_optionsBuilder.Options));
-            IGenericRepoService<TemplateWorkout> tpRepoService = new GenericRepoService<TemplateWorkout>(new EntityDBContext(_optionsBuilder.Options));
 
-            dowWorkout.WorkoutPeriod = await wpRepoService.GetByIdAsync(dowWorkout.WorkoutPeriodId);
-            dowWorkout.TemplateWorkout = await tpRepoService.GetByIdAsync(dowWorkout.TemplateWorkoutId);
+            dowWorkout.WorkoutPeriod = null;
+            dowWorkout.TemplateWorkout = null;
             dowWorkout.UserId = Guid.Parse(userId);
             if (dowWorkout.Id ==0)
             {

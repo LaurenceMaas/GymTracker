@@ -57,8 +57,11 @@ else if (EntityName == "workoutschedule")
     protected override async Task OnInitializedAsync()
     {
         _authState = await AuthStateProvider.GetAuthenticationStateAsync();
-        Guid userGuid = Guid.Parse(_authState.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)!.Value);
-        _userId = userGuid.ToString();
+        if (_authState.User.Identity.IsAuthenticated)
+        {
+            Guid userGuid = Guid.Parse(_authState.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)!.Value);
+            _userId = userGuid.ToString();
+        }
 
     }
 

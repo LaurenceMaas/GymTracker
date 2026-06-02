@@ -99,7 +99,7 @@
     [Parameter]
     public Func<TEntity, Task>? SaveHeaderData { get; set; }
     [Parameter]
-    public Func<List<TGridEntity>,int, Task>? SaveDetailData { get; set; }
+    public Func<List<TGridEntity>, int, Task<List<TGridEntity>>>? SaveDetailData { get; set; }
     [Parameter]
     public Func<Dictionary<object, List<TGridEntityDetails>>, Task>? SaveGridDetailData { get; set; }
     [Parameter]
@@ -180,8 +180,7 @@
 
         if (!result.Canceled)
         {
-            _gridData = (await repo.GetAllAsync()).ToList();
-
+            _gridData = LoadData != null ? await LoadData() : (await repo.GetAllAsync()).ToList();
             await _grid.ReloadServerData();
             StateHasChanged();
         }
