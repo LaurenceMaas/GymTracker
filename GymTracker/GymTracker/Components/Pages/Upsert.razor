@@ -113,12 +113,6 @@
                                 @foreach (var item in items)
                                 {
                                     var id = (int)item.GetType().GetProperty("Id")!.GetValue(item)!;
-@*                                     var displayProp = item.GetType().GetProperty("Description")
-                                    ?? item.GetType().GetProperty("Name");
-
-                                    var text = displayProp?.GetValue(item)?.ToString(); *@
-
-                                    @* <MudSelectItem Value="@id">@text</MudSelectItem> *@
                                     <MudSelectItem Value="@id">
                                         @GetDisplayProperty(item)
                                     </MudSelectItem>

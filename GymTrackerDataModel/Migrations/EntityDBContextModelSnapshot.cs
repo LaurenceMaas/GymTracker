@@ -22,6 +22,155 @@ namespace GymTrackerDataModel.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("GymTrackerDataModel.Models.ActualExercise", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("ActualTemplateExerciseId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ActualWorkoutId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("Createdatetime")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1024)
+                        .HasColumnType("nvarchar(1024)");
+
+                    b.Property<int>("TemplateExerciseId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ActualTemplateExerciseId");
+
+                    b.HasIndex("ActualWorkoutId");
+
+                    b.HasIndex("TemplateExerciseId");
+
+                    b.ToTable("TRN_ActualExercise");
+                });
+
+            modelBuilder.Entity("GymTrackerDataModel.Models.ActualSet", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("ActualExerciseId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("Createdatetime")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("ExecutionOrder")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1024)
+                        .HasColumnType("nvarchar(1024)");
+
+                    b.Property<int>("TemplateSetId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ActualExerciseId");
+
+                    b.HasIndex("TemplateSetId");
+
+                    b.ToTable("TRN_ActualSet");
+                });
+
+            modelBuilder.Entity("GymTrackerDataModel.Models.ActualSetMetric", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("ActualNumericValue")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("ActualSetId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ActualTextValue")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<DateTime>("Createdatetime")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1024)
+                        .HasColumnType("nvarchar(1024)");
+
+                    b.Property<decimal>("PlannedNumericValue")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("PlannedTextValue")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<int>("TemplateSetMetricId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ActualSetId");
+
+                    b.HasIndex("TemplateSetMetricId");
+
+                    b.ToTable("TRN_ActualSetMetric");
+                });
+
+            modelBuilder.Entity("GymTrackerDataModel.Models.ActualWorkout", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("DOWWorkoutId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1024)
+                        .HasColumnType("nvarchar(1024)");
+
+                    b.Property<Guid>("PerformedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("WorkoutEndDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<TimeSpan>("WorkoutEndTime")
+                        .HasColumnType("time");
+
+                    b.Property<DateTime>("WorkoutStartDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<TimeSpan>("WorkoutStartTime")
+                        .HasColumnType("time");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DOWWorkoutId");
+
+                    b.ToTable("TRN_ActualWorkout");
+                });
+
             modelBuilder.Entity("GymTrackerDataModel.Models.DOWWorkout", b =>
                 {
                     b.Property<int>("Id")
@@ -259,6 +408,82 @@ namespace GymTrackerDataModel.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("LKP_WorkoutPeriod");
+                });
+
+            modelBuilder.Entity("GymTrackerDataModel.Models.ActualExercise", b =>
+                {
+                    b.HasOne("GymTrackerDataModel.Models.TemplateExercise", "ActualTemplateExercise")
+                        .WithMany()
+                        .HasForeignKey("ActualTemplateExerciseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("GymTrackerDataModel.Models.ActualWorkout", "ActualWorkout")
+                        .WithMany()
+                        .HasForeignKey("ActualWorkoutId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("GymTrackerDataModel.Models.TemplateExercise", "TemplateExercise")
+                        .WithMany()
+                        .HasForeignKey("TemplateExerciseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("ActualTemplateExercise");
+
+                    b.Navigation("ActualWorkout");
+
+                    b.Navigation("TemplateExercise");
+                });
+
+            modelBuilder.Entity("GymTrackerDataModel.Models.ActualSet", b =>
+                {
+                    b.HasOne("GymTrackerDataModel.Models.ActualExercise", "ActualExercise")
+                        .WithMany()
+                        .HasForeignKey("ActualExerciseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("GymTrackerDataModel.Models.TemplateSet", "TemplateSet")
+                        .WithMany()
+                        .HasForeignKey("TemplateSetId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("ActualExercise");
+
+                    b.Navigation("TemplateSet");
+                });
+
+            modelBuilder.Entity("GymTrackerDataModel.Models.ActualSetMetric", b =>
+                {
+                    b.HasOne("GymTrackerDataModel.Models.ActualSet", "ActualSet")
+                        .WithMany()
+                        .HasForeignKey("ActualSetId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("GymTrackerDataModel.Models.TemplateSetMetric", "TemplateSetMetric")
+                        .WithMany()
+                        .HasForeignKey("TemplateSetMetricId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("ActualSet");
+
+                    b.Navigation("TemplateSetMetric");
+                });
+
+            modelBuilder.Entity("GymTrackerDataModel.Models.ActualWorkout", b =>
+                {
+                    b.HasOne("GymTrackerDataModel.Models.DOWWorkout", "DOWWorkout")
+                        .WithMany()
+                        .HasForeignKey("DOWWorkoutId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("DOWWorkout");
                 });
 
             modelBuilder.Entity("GymTrackerDataModel.Models.DOWWorkout", b =>

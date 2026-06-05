@@ -63,6 +63,7 @@ builder.Services.AddScoped(typeof(IGenericRepoService<>), typeof(GenericRepoServ
 builder.Services.AddScoped(typeof(IWorkoutExerciseSetService), typeof(WorkoutExerciseSetService));
 builder.Services.AddScoped(typeof(IExerciseService), typeof(ExerciseService));
 builder.Services.AddScoped(typeof(IWorkoutScheduleService), typeof(WorkoutScheduleService));
+builder.Services.AddScoped(typeof(IWorkoutHistory), typeof(WorkoutHistory));
 
 
 builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("EmailSettings"));

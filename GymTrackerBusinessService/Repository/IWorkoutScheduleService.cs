@@ -11,7 +11,7 @@ using System.Threading.Tasks;
 
 namespace GymTrackerBusinessService.Repository
 {
-    public  interface IWorkoutScheduleService
+    public interface IWorkoutScheduleService
     {
         Task SaveWorkoutScheduleData(DOWWorkout dowWorkout,string userId);
         Task<List<DOWWorkout>> LoadDOWDataPerUser(string UserId);
@@ -25,8 +25,6 @@ namespace GymTrackerBusinessService.Repository
         {
             _optionsBuilder = Helpers.BuildOptions();
             IGenericRepoService<DOWWorkout> genericRepoService = new GenericRepoService<DOWWorkout>(new EntityDBContext(_optionsBuilder.Options));
-            var result = (await genericRepoService.GetAllAsync()).ToList().FindAll(x => x.UserId.ToString().Equals(UserId))
-                .OrderBy(x => x.DayOfWeek).ToList();
             return (await genericRepoService.GetAllAsync()).ToList().FindAll(x => x.UserId.ToString().Equals(UserId)).OrderBy(x => x.DayOfWeek).ToList();
         }
 

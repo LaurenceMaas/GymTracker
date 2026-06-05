@@ -6,6 +6,7 @@
 @inject IWorkoutExerciseSetService workoutService
 @inject IExerciseService exerciseService
 @inject IWorkoutScheduleService workoutScheduleService
+@inject IWorkoutHistory workoutHistory
 
 @if (EntityName == "exercise")
 {
@@ -46,6 +47,17 @@ else if (EntityName == "workoutschedule")
                 EntityName="Workout Schedule"
                 DisplayAddEdit="false" />
 } 
+else if (EntityName == "logworkout")
+{
+
+    <ManageGrid TEntity="WorkoputHeaderDisplayVM"
+                TGridEntity="EmptyGridModel"
+                TGridEntityDetails="EmptyGridModel"
+                EntityName="Workout History"
+                DisplayAddEdit="false"
+                DetailName="Workout history"
+                LoadData="@(() => workoutHistory.LoadWorkoutHistoryPerUser(_userId))" />
+}
 
 @code {
     [Parameter]

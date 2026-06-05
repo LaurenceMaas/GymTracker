@@ -21,8 +21,11 @@ namespace GymTrackerDataModel
         public DbSet<Metric> LKP_Metric { get; set; }
         public DbSet<ExerciseMetric> LKP_ExerciseMetric { get; set; }
         public DbSet<DOWWorkout> TRN_DOWWorkout { get; set; }
-      //  public DbSet<UserWorkoutSchedule> TRN_UserWorkoutSchedule { get; set; }
         public DbSet<WorkoutPeriod> LKP_WorkoutPeriod { get; set; }
+        public DbSet<ActualWorkout> TRN_ActualWorkout { get; set; }
+        public DbSet<ActualExercise> TRN_ActualExercise { get; set; }
+        public DbSet<ActualSet> TRN_ActualSet { get; set; }
+        public DbSet<ActualSetMetric> TRN_ActualSetMetric { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -66,9 +69,6 @@ namespace GymTrackerDataModel
             .HasForeignKey(tsm => tsm.MetricId)
             .OnDelete(DeleteBehavior.Restrict);
 
-            //modelBuilder.Entity<TemplateSetMetric>()
-            //.HasIndex(x => new { x.TemplateSetId, x.MetricId })
-            //.IsUnique();
 
             modelBuilder.Entity<TemplateWorkout>().ToTable("LKP_WorkoutTemplate");
 
@@ -102,6 +102,30 @@ namespace GymTrackerDataModel
                     .HasForeignKey(x => x.MetricId)
                     .OnDelete(DeleteBehavior.Restrict);
             });
+
+            modelBuilder.Entity<ActualExercise>()
+            .HasOne(a => a.TemplateExercise)
+            .WithMany()
+            .HasForeignKey(a => a.TemplateExerciseId)
+            .OnDelete(DeleteBehavior.Restrict); 
+
+            modelBuilder.Entity<ActualExercise>()
+            .HasOne(a => a.ActualTemplateExercise)
+            .WithMany()
+            .HasForeignKey(a => a.ActualTemplateExerciseId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<ActualSet>()
+            .HasOne(a => a.TemplateSet)
+            .WithMany()
+            .HasForeignKey(a => a.TemplateSetId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<ActualSetMetric>()
+            .HasOne(a => a.TemplateSetMetric)
+            .WithMany()
+            .HasForeignKey(a => a.TemplateSetMetricId)
+            .OnDelete(DeleteBehavior.Restrict);
 
         }
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
