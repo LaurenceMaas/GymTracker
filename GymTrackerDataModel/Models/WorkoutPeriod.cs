@@ -8,5 +8,7 @@ namespace GymTrackerDataModel.Models
 {
     public class WorkoutPeriod : LookupModel
     {
+        public TimeSpan StartTime { get; set; }
+        public TimeSpan EndTime { get; set; }
     }
 }

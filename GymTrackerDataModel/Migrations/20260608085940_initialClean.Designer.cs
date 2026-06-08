@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace GymTrackerDataModel.Migrations
 {
     [DbContext(typeof(EntityDBContext))]
-    [Migration("20260603121001_initialClean")]
+    [Migration("20260608085940_initialClean")]
     partial class initialClean
     {
         /// <inheritdoc />
@@ -407,6 +407,12 @@ namespace GymTrackerDataModel.Migrations
                     b.Property<string>("Description")
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
+
+                    b.Property<TimeSpan>("EndTime")
+                        .HasColumnType("time");
+
+                    b.Property<TimeSpan>("StartTime")
+                        .HasColumnType("time");
 
                     b.HasKey("Id");
 

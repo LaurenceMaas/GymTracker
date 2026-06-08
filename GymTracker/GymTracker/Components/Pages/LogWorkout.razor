@@ -1,0 +1,47 @@
+﻿@page "/logworkout"
+@using GymTrackerBusinessService.Repository
+@using GymTrackerDataModel.Models
+@using GymTrackerHelpers
+@using GymTrackerBusinessService.Generic
+@using System.Net.Http.Json
+@using System.Linq.Expressions
+@using System.Reflection;
+@using System.ComponentModel;
+
+@inject IWorkoutScheduleService workoutScheduleService
+@inject AuthenticationStateProvider AuthStateProvider
+<MudButtonGroup Class="ma-0 pa-0" Color="Color.Success" Variant="Variant.Filled">
+    <MudButton>
+        Start the workout
+    </MudButton>
+</MudButtonGroup>
+
+<ManageGrid TEntity="DOWWorkout"
+            TGridEntity="EmptyGridModel"
+            TGridEntityDetails="EmptyGridModel"
+            EntityName="You're doing this workout now:"
+            CanEditAddButton="false"
+            DisplayAddEdit="false"
+            DetailName=""
+            Searchable="false"
+            LoadData="@(() => workoutScheduleService.LoadDOWDataPerUserCurrentDateTime(_userId))" />
+
+@code {
+    [Parameter]
+    public string? EntityName { get; set; }
+    private AuthenticationState? _authState { get; set; }
+    private Guid _userGuid { get; set; }
+    private string _userId { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        _authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        if (_authState.User.Identity.IsAuthenticated)
+        {
+            Guid userGuid = Guid.Parse(_authState.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)!.Value);
+            _userId = userGuid.ToString();
+        }
+
+    }
+
+}

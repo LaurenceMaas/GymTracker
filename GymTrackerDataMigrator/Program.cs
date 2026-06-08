@@ -352,9 +352,9 @@ void CreateSeedData(EntityDBContext context)
     {
         DbSet<WorkoutPeriod> workoutPeriod = context.LKP_WorkoutPeriod;
         workoutPeriod.AddRange(
-        new WorkoutPeriod { Description = "Morning" },
-        new WorkoutPeriod { Description = "Afternoon" },
-         new WorkoutPeriod { Description = "Evening" }
+        new WorkoutPeriod { Description = "Morning",StartTime = new TimeSpan(5,0,0), EndTime = new TimeSpan(12,0,0) },
+        new WorkoutPeriod { Description = "Afternoon" ,StartTime = new TimeSpan(12, 1,0), EndTime = new TimeSpan(18, 0,0) },
+        new WorkoutPeriod { Description = "Evening", StartTime = new TimeSpan(18, 1,0), EndTime = new TimeSpan(4, 59, 0) }
         );
         context.SaveChanges();
     }

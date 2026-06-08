@@ -26,5 +26,5 @@ var db = new EntityDBContext(_optionsBuilder.Options);
 //}
 //await test.SaveExerciseSetsData(data);
 IWorkoutScheduleService test = new WorkoutScheduleService();
-var result = test.LoadDOWDataPerUser("2b27464b-e66e-46eb-a533-b0b2b62719b6");
-Console.WriteLine("Hello, World!" + result.Result.FirstOrDefault().SortOrder.ToString());
+var result = await test.LoadDOWDataPerUserCurrentDateTime("2b27464b-e66e-46eb-a533-b0b2b62719b6");
+Console.WriteLine($"{result}");

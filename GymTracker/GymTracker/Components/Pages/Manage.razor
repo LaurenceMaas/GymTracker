@@ -14,7 +14,7 @@
                 TGridEntity="EmptyGridModel"
                 TGridEntityDetails="EmptyGridModel"
                 SaveHeaderData="@((x) => exerciseService.SaveExerciseData(x))"
-                EntityName="Exercise"
+                EntityName="Exercise List"
                 CanEditAddButton = "true"
                 DisplayAddEdit = "false"/>
 
@@ -24,7 +24,7 @@ else if (EntityName == "templateworkout")
     <ManageGrid TEntity="TemplateWorkout"
                 TGridEntity="WorkoutGroupVM"
                 TGridEntityDetails="WorkoutSetVM"
-                EntityName="Workout"
+                EntityName="Workout List"
                 LoadGridData="@(x => workoutService.GetHeaderDataAsync(x))"
                 LoadGridDetailData="@(x => workoutService.GetDetailDataAsync(x))"
                 LoadNewGridData="@((x) => workoutService.OnAddNewExercise(x))"
@@ -62,6 +62,7 @@ else if (EntityName == "viewworkouthistory")
                 DetailName="Workout history"
                 LoadData="@(() => workoutHistory.LoadWorkoutHistoryPerUser(_userId))" />
 }
+
 
 @code {
     [Parameter]

@@ -22,21 +22,22 @@
              Bordered="true" Dense="true"
              EditTrigger="@DataGridEditTrigger.Manual">
     <ToolBarContent>
-        <MudText Typo="Typo.h6">@EntityName List</MudText>
+
+        <MudText Typo="Typo.h6">@EntityName</MudText>
         <MudSpacer />
-        <MudTextField @bind-Value="_searchString" Placeholder="Search" Adornment="Adornment.Start" Immediate="true"
-                      AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0"></MudTextField>
-        <MudSpacer />
+        @if (Searchable)
+        {
+            <MudTextField @bind-Value="_searchString" Placeholder="Search" Adornment="Adornment.Start" Immediate="true"
+                          AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0"></MudTextField>
+            <MudSpacer />
+        }
         @if (CanEditAddButton)
         {
-            <MudButtonGroup Class
-            ="ma-0 pa-0" Color
-            ="Color.Success" Variant
-            ="Variant.Filled">
+            <MudButtonGroup Class="ma-0 pa-0" Color="Color.Success" Variant="Variant.Filled">
                 <MudButton OnClick="AddNewAsync">
-                Add New @* @EntityName *@
-            </MudButton>
-        </MudButtonGroup>
+                    Add New
+                </MudButton>
+            </MudButtonGroup>
         }
     </ToolBarContent>
     <Columns>
@@ -71,17 +72,23 @@
             </TemplateColumn>
 
         }
-        <TemplateColumn>
-            <CellTemplate>
-                <MudStack Row>
-                    <MudIconButton Icon="@Icons.Material.Filled.Delete" aria-label="delete" OnClick="@(() => DeleteItemAsync(context.Item))" />
-                    <MudIconButton Icon="@Icons.Material.Filled.Edit" aria-label="edit" OnClick="@(() => NewUpdateItemAsync(_maxWidth,context.Item))" />
-                </MudStack>
-            </CellTemplate>
-        </TemplateColumn>
+        @if (CanEditAddButton)
+        {
+            <TemplateColumn>
+                <CellTemplate>
+                    <MudStack Row>
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" aria-label="delete" OnClick="@(() => DeleteItemAsync(context.Item))" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" aria-label="edit" OnClick="@(() => NewUpdateItemAsync(_maxWidth,context.Item))" />
+                    </MudStack>
+                </CellTemplate>
+            </TemplateColumn>
+        }
     </Columns>
     <PagerContent>
-        <MudDataGridPager T="TEntity" PageSizeOptions="new int[] {5,10,20,50}" />
+        @if (Searchable)
+        {
+            <MudDataGridPager T="TEntity" PageSizeOptions="new int[] {5,10,20,50}" />
+        }
     </PagerContent>
 </MudDataGrid>
 
@@ -113,9 +120,11 @@
     [Parameter]
     public string? DetailName { get; set; }
     [Parameter]
-    public bool DisplayAddEdit { get; set; }
+    public bool DisplayAddEdit { get; set; } = true;
     [Parameter]
-    public bool CanEditAddButton { get; set; }
+    public bool CanEditAddButton { get; set; } = true;
+    [Parameter]
+    public bool Searchable { get; set; } = true;
 
 
     private MudDataGrid<TEntity> _grid = default!;

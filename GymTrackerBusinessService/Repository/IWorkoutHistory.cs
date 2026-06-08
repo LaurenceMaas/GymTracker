@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -20,6 +21,7 @@ namespace GymTrackerBusinessService.Repository
         [IgnoreInGrid]
         public int TemplateWorkoutId { get; set; }
         [DisplayName("Workout Name")]
+        [MaxLength(255)]
         public string? WorkoutName { get; set; }
         [DisplayName("Day Of the Week")]
         public DayOfWeek DayOfWeek { get; set; }
