@@ -27,11 +27,17 @@
         <MudTextField @bind-Value="_searchString" Placeholder="Search" Adornment="Adornment.Start" Immediate="true"
                       AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0"></MudTextField>
         <MudSpacer />
-        <MudButtonGroup Class="ma-0 pa-0" Color="Color.Success" Variant="Variant.Filled">
-            <MudButton OnClick="AddNewAsync">
+        @if (CanEditAddButton)
+        {
+            <MudButtonGroup Class
+            ="ma-0 pa-0" Color
+            ="Color.Success" Variant
+            ="Variant.Filled">
+                <MudButton OnClick="AddNewAsync">
                 Add New @* @EntityName *@
             </MudButton>
         </MudButtonGroup>
+        }
     </ToolBarContent>
     <Columns>
         @foreach (var prop in _properties)
@@ -108,6 +114,8 @@
     public string? DetailName { get; set; }
     [Parameter]
     public bool DisplayAddEdit { get; set; }
+    [Parameter]
+    public bool CanEditAddButton { get; set; }
 
 
     private MudDataGrid<TEntity> _grid = default!;
