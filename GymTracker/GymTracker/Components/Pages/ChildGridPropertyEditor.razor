@@ -1,0 +1,114 @@
+﻿@page "/childGridpropertyeditor"
+@using System.Net.Http.Json
+@using GymTrackerBusinessService.Generic
+@using GymTrackerDataModel.Models
+@using System.Linq.Expressions;
+@using System.Reflection;
+@using System.ComponentModel;
+@using System.ComponentModel.DataAnnotations;
+@using GymTrackerHelpers
+@using System.Collections;
+@using GymTracker.Models;
+@inject IServiceProvider ServiceProvider
+@typeparam TGridEntityDetails
+@if (collection && value is IEnumerable enumerable)
+{
+    int iter = 0;
+    @foreach (var item in enumerable)
+    {
+        var currentIndex = iter;
+        var properties = item.GetType().GetProperties()
+        .Where(p => p.GetCustomAttribute<IgnoreInGridAttribute>() == null)
+        .ToList();
+        foreach (var itemProp in properties)
+        {
+            var isDetailNav = itemProp.GetCustomAttribute<NavigationPropertyAttribute>() != null;
+            var itemPropVal = itemProp.GetValue(item);
+            if (isDetailNav)
+            {
+                var fkProp = ReflectionHelper.GetForeignKeyGrid(itemProp);
+                <MudAutocomplete T="int"
+                                 Value="@(@FormatDetailGridValue(item, fkProp) is int i ? i : 0)"
+                                 ValueChanged="@(v => SetNewDropDetailDownValue(fkProp, v,currentIndex,detail))"
+                                 Label="@ReflectionHelper.GetDisplayName(itemProp)"
+                                 Variant="Variant.Outlined"
+                                 FullWidth="true"
+                                 Margin="Margin.Dense"
+                                 SearchFunc="@( (value, token) => ReflectionHelper.SearchNavData(itemProp, value,ServiceProvider ,token) )"
+                                 ToStringFunc="@(id => GetDisplayText(itemProp.Name, id))"
+                                 Clearable="true"
+                                 MinCharacters="0"
+                                 OpenOnFocus="true"
+                                 AdornmentIcon="@Icons.Material.Filled.Search" />
+            }
+            if (itemProp.PropertyType == typeof(decimal?))
+            {
+                if (itemPropVal != null)
+                {
+                    <MudNumericField T="decimal"
+                                     Value="@(itemPropVal is decimal i ? i : 0)"
+                                     ValueChanged="@(v => itemProp.SetValue(item, v))"
+                                     Variant="Variant.Outlined"
+                                     FullWidth="true"
+                                     Margin="Margin.Dense" />
+                }
+            }
+            else if (itemProp.PropertyType == typeof(string))
+            {
+                if (!string.IsNullOrEmpty(itemPropVal?.ToString()))
+                {
+                    <MudTextField T="string"
+                                  Value="@(itemPropVal?.ToString() ?? "")"
+                                  ValueChanged="@(v => itemProp.SetValue(item, v))"
+                                  Variant="Variant.Outlined"
+                                  FullWidth="true"
+                                  Margin="Margin.Dense" />
+                }
+
+            }
+        }
+        iter++;
+    }
+    <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" OnClick="@(() => RemoveDetails(details, detail))" />
+
+}
+else
+{
+    var fkProp = ReflectionHelper.GetForeignKeyGrid(prop);
+    <MudItem xs="12" sm="6" md="4" Class="d-flex">
+        <MudStack Spacing="1" Class="w-100">
+            <ManageGridDetails isNavigation="@isNavigation"
+                               prop="@prop"
+                               FormatDetailGridValue="FormatDetailGridValue"
+                               Detail="@detail"
+                               SearchNavData="@ReflectionHelper.SearchNavData"
+                               FormatDetailValue="@ReflectionHelper.FormatDetailValue" />
+
+        </MudStack>
+    </MudItem>
+}
+
+
+@code {
+    [Parameter]
+    public bool collection { get; set; } = true;
+    [Parameter]
+    public bool isNavigation { get; set; } = true;
+    [Parameter]
+    public object? value { get; set; }
+    [Parameter]
+    public Func<object ,PropertyInfo,object> FormatDetailGridValue { get; set; }
+    [Parameter]
+    public Func<PropertyInfo, object?, int, TGridEntityDetails, Task> SetNewDropDetailDownValue { get; set; }
+    [Parameter]
+    public Func<string, int,string> GetDisplayText { get; set; }
+    [Parameter]
+    public TGridEntityDetails detail { get; set; }
+    [Parameter]
+    public List<TGridEntityDetails> details { get; set; }
+    [Parameter]
+    public Action<List<TGridEntityDetails>, TGridEntityDetails> RemoveDetails { get; set; }
+    [Parameter]
+    public PropertyInfo prop { get; set; }
+
+}

@@ -6,6 +6,7 @@
 @using GymTrackerHelpers
 @using System.Collections
 @typeparam TGridEntityDetails
+@inject IServiceProvider ServiceProvider
 
 @if (isNavigation)
 {
@@ -17,7 +18,7 @@
                      Variant="Variant.Outlined"
                      FullWidth="true"
                      Margin="Margin.Dense"
-                     SearchFunc="@( (value, token) => SearchNavData(prop, value, token) )"
+                     SearchFunc="@( (value, token) => SearchNavData(prop, value, ServiceProvider,token) )"
                      ToStringFunc="@(id => GetDisplayText(prop.Name, id))"
                      Clearable="true"
                      MinCharacters="0"
@@ -73,7 +74,7 @@ else
     public TGridEntityDetails? Detail { get; set; }
 
     [Parameter]
-    public Func<PropertyInfo, string, CancellationToken, Task<IEnumerable<int>>>? SearchNavData { get; set; }
+    public Func<PropertyInfo, string, IServiceProvider, CancellationToken, Task<IEnumerable<int>>>? SearchNavData { get; set; }
 
     [Parameter]
     public Func<string, int, string>? GetDisplayText { get; set; }

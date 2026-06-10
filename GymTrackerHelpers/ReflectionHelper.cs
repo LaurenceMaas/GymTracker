@@ -148,6 +148,62 @@ namespace GymTrackerHelpers
             //// Cast to IEnumerable and then to object
             //return ((IEnumerable)result!).Cast<object>();
         }
+        public static object FormatGridValue(object item, PropertyInfo prop)
+        {
+            var value = prop.GetValue(item);
+
+            if (value is DateTime dt)
+                return dt.ToString("yyyy-MM-dd");
+
+            return value ?? null;
+        }
+
+        public static async Task<IEnumerable<int>> SearchNavData(PropertyInfo prop, string value, IServiceProvider serviceProvider, CancellationToken token)
+        {
+            var items = await GetNavigationData(prop, serviceProvider);
+            IEnumerable<int> result = null;
+            if (!string.IsNullOrEmpty(value))
+            {
+                result = items
+                   .Where(x =>
+                   {
+                       var text = GetDisplayProperty(x)?.ToLower();
+                       return string.IsNullOrWhiteSpace(value) || text.Contains(value.ToLower());
+                   })
+                   .Select(x => (int)x.GetType().GetProperty("Id")!.GetValue(x)!);
+            }
+            else
+            {
+                result = items.Select(x => (int)x.GetType().GetProperty("Id")!.GetValue(x)!);
+            }
+
+            return await Task.FromResult(result);
+        }
+        public static string GetDisplayProperty(object item)
+        {
+            var prop = item.GetType().GetProperty("Description")
+                   ?? item.GetType().GetProperty("Name");
+
+            return prop?.GetValue(item)?.ToString() ?? "";
+        }
+        public static void SetGridValue(PropertyInfo prop, object? value, object? item)
+        {
+            prop.SetValue(item, value);
+        }
+        public static object FormatDetailGridValue(object item, PropertyInfo prop)
+        {
+            var value = prop.GetValue(item);
+            return value ?? null;
+        }
+        public static string FormatDetailValue(object item, PropertyInfo prop)
+        {
+            var value = prop.GetValue(item);
+
+            if (value is DateTime dt)
+                return dt.ToString("yyyy-MM-dd");
+
+            return value?.ToString() ?? string.Empty;
+        }
 
     }
 

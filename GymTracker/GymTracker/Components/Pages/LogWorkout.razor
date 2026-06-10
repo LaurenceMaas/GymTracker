@@ -10,21 +10,23 @@
 
 @inject IWorkoutScheduleService workoutScheduleService
 @inject AuthenticationStateProvider AuthStateProvider
-<MudButtonGroup Class="ma-0 pa-0" Color="Color.Success" Variant="Variant.Filled">
-    <MudButton>
-        Start the workout
-    </MudButton>
-</MudButtonGroup>
+<MudPaper Outlined="true" Class="pa-4 mt-4">
+    <MudButtonGroup Class="ma-0 pa-0" Color="Color.Success" Variant="Variant.Filled">
+        <MudButton>
+            Start the workout
+        </MudButton>
+    </MudButtonGroup>
 
-<ManageGrid TEntity="DOWWorkout"
-            TGridEntity="EmptyGridModel"
-            TGridEntityDetails="EmptyGridModel"
-            EntityName="You're doing this workout now:"
-            CanEditAddButton="false"
-            DisplayAddEdit="false"
-            DetailName=""
-            Searchable="false"
-            LoadData="@(() => workoutScheduleService.LoadDOWDataPerUserCurrentDateTime(_userId))" />
+    <ManageGrid TEntity="DOWWorkout"
+                TGridEntity="EmptyGridModel"
+                TGridEntityDetails="EmptyGridModel"
+                EntityName="You're doing this workout now:"
+                CanEditAddButton="false"
+                DisplayAddEdit="false"
+                DetailName=""
+                Searchable="false"
+                LoadData="@(() => workoutScheduleService.LoadDOWDataPerUserCurrentDateTime(_userId))" />
+</MudPaper>
 
 @code {
     [Parameter]
