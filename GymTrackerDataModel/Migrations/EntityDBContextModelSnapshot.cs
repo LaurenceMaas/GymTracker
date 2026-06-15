@@ -152,10 +152,13 @@ namespace GymTrackerDataModel.Migrations
                     b.Property<Guid>("PerformedByUserId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<DateTime>("WorkoutEndDate")
+                    b.Property<int>("WorkOutStatusId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("WorkoutEndDate")
                         .HasColumnType("datetime2");
 
-                    b.Property<TimeSpan>("WorkoutEndTime")
+                    b.Property<TimeSpan?>("WorkoutEndTime")
                         .HasColumnType("time");
 
                     b.Property<DateTime>("WorkoutStartDate")
@@ -167,6 +170,8 @@ namespace GymTrackerDataModel.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("DOWWorkoutId");
+
+                    b.HasIndex("WorkOutStatusId");
 
                     b.ToTable("TRN_ActualWorkout");
                 });
@@ -393,6 +398,23 @@ namespace GymTrackerDataModel.Migrations
                     b.ToTable("LKP_WorkoutTemplate", (string)null);
                 });
 
+            modelBuilder.Entity("GymTrackerDataModel.Models.WorkOutStatus", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("LKP_WorkOutStatus");
+                });
+
             modelBuilder.Entity("GymTrackerDataModel.Models.WorkoutPeriod", b =>
                 {
                     b.Property<int>("Id")
@@ -489,7 +511,15 @@ namespace GymTrackerDataModel.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("GymTrackerDataModel.Models.WorkOutStatus", "WorkOutStatus")
+                        .WithMany()
+                        .HasForeignKey("WorkOutStatusId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.Navigation("DOWWorkout");
+
+                    b.Navigation("WorkOutStatus");
                 });
 
             modelBuilder.Entity("GymTrackerDataModel.Models.DOWWorkout", b =>

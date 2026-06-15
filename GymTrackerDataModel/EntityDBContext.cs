@@ -26,6 +26,7 @@ namespace GymTrackerDataModel
         public DbSet<ActualExercise> TRN_ActualExercise { get; set; }
         public DbSet<ActualSet> TRN_ActualSet { get; set; }
         public DbSet<ActualSetMetric> TRN_ActualSetMetric { get; set; }
+        public DbSet<WorkOutStatus> LKP_WorkOutStatus { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

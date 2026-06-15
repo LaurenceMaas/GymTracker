@@ -15,14 +15,15 @@
 
 @if (!isDetail)
 {
+    var isReadonly = prop.GetCustomAttribute<ReadOnlyAttribute>() != null;
     @if (isNavigation)
     {
         var fkProp = ReflectionHelper.GetForeignKeyGrid<TGridEntity>(prop);
-
+        _value = FormatGridValue(Item, fkProp) is int i ? i : 0;
         <MudAutocomplete T="int"
-                         Value="@(FormatGridValue(Item,fkProp) is int i ? i : 0)"
                          ValueChanged="@(v => SetNewDropDownValue(fkProp, v,Item))"
-                         Label="@ReflectionHelper.GetDisplayName(prop)"
+                         Value="(int)_value"
+                         Label="@ReflectionHelper.GetDisplayName(Item,prop)"
                          Variant="Variant.Outlined"
                          FullWidth="true"
                          Margin="Margin.Dense"
@@ -31,33 +32,42 @@
                          Clearable="true"
                          MinCharacters="0"
                          OpenOnFocus="true"
-                         AdornmentIcon="@Icons.Material.Filled.Search" />
+                         AdornmentIcon="@Icons.Material.Filled.Search"
+                         ReadOnly="isReadonly" />
     }
     else if (prop.PropertyType == typeof(string) && !isNavigation)
     {
+        _value = FormatGridValue(Item, prop) is string i ? i : "" ;
         <MudTextField T="string"
-                      Value="@(@FormatGridValue(Item, prop) is string i ? i : "" )"
+                      Value="_value.ToString()"
                       ValueChanged="@(v => SetGridValue(prop, v,Item))"
                       For="@( (Expression<Func<string>>)ReflectionHelper.GetExpression(prop, Item!) )"
-                      Label="@ReflectionHelper.GetDisplayName(prop)"
+                      Label="@ReflectionHelper.GetDisplayName(Item,prop)"
                       Variant="Variant.Outlined"
                       FullWidth="true"
-                      Margin="Margin.Dense" />
+                      Margin="Margin.Dense"
+                      ReadOnly="isReadonly"
+                      Style="@GeneralHelpers.GetWidth(_value?.ToString())" 
+                      Lines="2"/>
     }
     else if (prop.PropertyType == typeof(int) && !isNavigation)
     {
+        _value = FormatGridValue(Item, prop) is int i ? i : 0;
         <MudNumericField T="int"
-                         Value="@(@FormatGridValue(Item, prop) is int i ? i:0 )"
+                         Value="(int)_value"
                          ValueChanged="@(v => SetGridValue(prop, v,Item))"
                          For="@((Expression<Func<int>>)ReflectionHelper.GetExpression(prop, Item!) )"
-                         Label="@ReflectionHelper.GetDisplayName(prop)"
+                         Label="@ReflectionHelper.GetDisplayName(Item,prop)"
                          Variant="Variant.Outlined"
                          FullWidth="true"
-                         Margin="Margin.Dense" />
+                         Margin="Margin.Dense"
+                         ReadOnly="isReadonly" />
     }
+
 }
 
 @code {
+    private object? _value { get; set; }
     [Parameter]
     public bool isDetail { get; set; } = true;
     [Parameter]

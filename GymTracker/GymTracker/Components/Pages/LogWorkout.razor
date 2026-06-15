@@ -1,49 +1,378 @@
-﻿@page "/logworkout"
-@using GymTrackerBusinessService.Repository
+﻿@using GymTrackerBusinessService.Repository
 @using GymTrackerDataModel.Models
 @using GymTrackerHelpers
 @using GymTrackerBusinessService.Generic
 @using System.Net.Http.Json
 @using System.Linq.Expressions
-@using System.Reflection;
-@using System.ComponentModel;
+@using System.Reflection
+@using System.ComponentModel
+@using System.Timers
+@using System.Diagnostics
 
-@inject IWorkoutScheduleService workoutScheduleService
+@inject ILogWorkOutService logWorkOutService
 @inject AuthenticationStateProvider AuthStateProvider
-<MudPaper Outlined="true" Class="pa-4 mt-4">
-    <MudButtonGroup Class="ma-0 pa-0" Color="Color.Success" Variant="Variant.Filled">
-        <MudButton>
-            Start the workout
-        </MudButton>
-    </MudButtonGroup>
+@inject IDialogService DialogService
+@typeparam TGridEntity
+@typeparam TGridEntityDetails
 
-    <ManageGrid TEntity="DOWWorkout"
-                TGridEntity="EmptyGridModel"
-                TGridEntityDetails="EmptyGridModel"
-                EntityName="You're doing this workout now:"
-                CanEditAddButton="false"
-                DisplayAddEdit="false"
-                DetailName=""
-                Searchable="false"
-                LoadData="@(() => workoutScheduleService.LoadDOWDataPerUserCurrentDateTime(_userId))" />
+<MudPaper Outlined="true" Class="pa-6">
+
+    <!-- Status Section -->
+    <MudPaper Outlined="true" Class="pa-4 mb-4">
+        <MudText Typo="Typo.h5">
+            @_workoutText
+        </MudText>
+        <MudStack Row="true" Spacing="4" AlignItems="AlignItems.Center">
+
+            <MudTimePicker Label="Start Time"
+                           @bind-Time="_starttime"
+                           ReadOnly="true" />
+            <MudTimePicker Label="End Time"
+                           @bind-Time="_endtime"
+                           ReadOnly="true" />
+            <MudTextField T="string"
+                          Value="@FormatTime()"
+                          Variant="Variant.Outlined"
+                          ReadOnly="true"
+                          Label="Workout Duration"
+                          Style="width:180px;" />
+            <MudSpacer />
+
+        </MudStack>
+
+        @if (_viewModel.Count > 0)
+        {
+            <MudPaper Outlined="true" Class="pa-4 mt-4">
+
+                <MudDataGrid T="TGridEntity"
+                             @ref="_grid"
+                             Items="@_viewModel"
+                             ReadOnly="false"
+                             Bordered="true"
+                             Dense="true"
+                             Class="upsert-detail-grid">
+
+                    <Columns>
+                        <HierarchyColumn T="TGridEntity" HeaderStyle="width:56px;" />
+                        @foreach (var prop in _gridHeaderproperties)
+                        {
+                            var isDetail = prop.GetCustomAttribute<DetailPropertyAttribute>() != null;
+                            var isNavigation = prop.GetCustomAttribute<NavigationPropertyAttribute>() != null;
+                            var type = prop.PropertyType;
+                            <TemplateColumn Title="@ReflectionHelper.GetDisplayName(prop)">
+                                <CellTemplate Context="cell">
+                                    <GridPropertyEditor isDetail="isDetail"
+                                                        isNavigation="isNavigation"
+                                                        Item="cell.Item"
+                                                        prop="prop"
+                                                        FormatGridValue="ReflectionHelper.FormatGridValue"
+                                                        SetNewDropDownValue="SetNewDropDownValue"
+                                                        SearchNavData="ReflectionHelper.SearchNavData"
+                                                        GetDisplayText="GetDisplayText"
+                                                        TGridEntity="TGridEntity"
+                                                        SetGridValue="ReflectionHelper.SetGridValue" />
+                                </CellTemplate>
+                            </TemplateColumn>
+                        }
+                    </Columns>
+
+                    <ChildRowContent Context="cell">
+                        <MudPaper Outlined="true" Class="pa-4 mx-2 my-3">
+                            <MudStack Spacing="3">
+                                @{
+                                    var details = _detailCache.ContainsKey(cell.Item)
+                                    ? _detailCache[cell.Item]
+                                    : new List<TGridEntityDetails>();
+                                }
+
+
+                                @if (details != null)
+                                {
+                                    foreach (var detail in details)
+                                    {
+                                        <MudPaper Elevation="0" Outlined="true" Class="pa-3">
+                                            <MudStack Spacing="3">
+                                                <MudGrid Spacing="3" AlignItems="AlignItems.Stretch">
+                                                    <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+                                                        @foreach (var prop in _viewModelDetails)
+                                                        {
+
+                                                            var value = prop.GetValue(detail);
+                                                            var isNavigation = prop.GetCustomAttribute<NavigationPropertyAttribute>() != null;
+                                                            var collection = prop.GetCustomAttribute<CollectionAttribute>() != null;
+
+                                                            <ChildGridPropertyEditor collection="collection"
+                                                                                     value="value"
+                                                                                     FormatDetailGridValue="ReflectionHelper.FormatDetailGridValue"
+                                                                                     SetNewDropDetailDownValue="SetNewDropDetailDownValue"
+                                                                                     GetDisplayText="GetDisplayText"
+                                                                                     isNavigation="isNavigation"
+                                                                                     TGridEntityDetails="TGridEntityDetails"
+                                                                                     detail="detail"
+                                                                                     details="details"
+                                                                                     RemoveDetails="RemoveDetails"
+                                                                                     prop="prop"
+                                                                                     canDelete="false"
+                                                                                     OnSetCompleted="OnSetCompleted" />
+                                                        }
+                                                    </MudStack>
+                                                </MudGrid>
+                                            </MudStack>
+                                        </MudPaper>
+                                    }
+                                }
+                                else
+                                {
+                                    <MudText Typo="Typo.body2" Color="Color.Secondary">No detail records are available for this row.</MudText>
+                                }
+                            </MudStack>
+                        </MudPaper>
+                    </ChildRowContent>
+                </MudDataGrid>
+
+            </MudPaper>
+        }
+
+    </MudPaper>
+    @if (_viewModel.Count > 0)
+    {
+        <MudButton Color="Color.Success"
+                   Variant="Variant.Filled"
+                   OnClick="Start"
+                   Disabled="_strtresWorkOut">
+            Start/Resume Workout
+        </MudButton>
+        <MudButton Color="Color.Error"
+                   Variant="Variant.Filled"
+                   OnClick="Reset"
+                   Disabled="_resetWorkOut">
+            Reset Workout
+        </MudButton>
+        <MudButton Color="Color.Warning"
+                   Variant="Variant.Filled"
+                   OnClick="Pause"
+                   Disabled="_pauseWorkOut">
+            Pause Workout
+        </MudButton>
+        <MudButton Color="Color.Success"
+                   Variant="Variant.Filled"
+                   OnClick="EndWorkout"
+                   Disabled="_endWorkOut">
+            End Workout
+        </MudButton>
+
+    }
 </MudPaper>
 
 @code {
+
     [Parameter]
-    public string? EntityName { get; set; }
+    public Func<TGridEntity, List<TGridEntity>, Task<List<TGridEntity>>>? UpdateGridData { get; set; }
+    [Parameter]
+    public Func<TGridEntity, Task<List<TGridEntityDetails>>>? LoadGridDetailData { get; set; }
+    [Parameter]
+    public Func<int, Task<List<TGridEntity>>>? LoadGridData { get; set; }
+    [Parameter]
+    public Func<Guid,int,DateTime,string?,Task >? SaveWorkOutData { get; set; }
+
+    private Dictionary<string, IEnumerable<object>> _navData = new();
+    private Dictionary<object, List<TGridEntityDetails>> _detailCache = new();
+
+    private List<System.Reflection.PropertyInfo> _gridHeaderproperties = new();
+    private List<System.Reflection.PropertyInfo> _viewModelDetails = new();
+
     private AuthenticationState? _authState { get; set; }
     private Guid _userGuid { get; set; }
-    private string _userId { get; set; }
+    private string? _userId { get; set; }
+    private Stopwatch stopwatch = new Stopwatch();
+    private Timer uiRefreshTimer = new Timer(1000); // Updates every second for smooth tracking
+    private TimeSpan elapsedTime = TimeSpan.Zero;
+    private bool isRunning => stopwatch.IsRunning;
+    private TimeSpan? _starttime;
+    private TimeSpan? _endtime;
+    private MudDataGrid<TGridEntity> _grid = default!;
+    private List<TGridEntity>? _viewModel { get; set; }
+    private string? _workoutText;
+    private bool _strtresWorkOut { get; set; }
+    private bool _pauseWorkOut { get; set; }
+    private bool _resetWorkOut { get; set; }
+    private bool _endWorkOut { get; set; }
+    private int? _idValue { get; set; }
+    private int _dowId { get; set; }
 
     protected override async Task OnInitializedAsync()
     {
+        _strtresWorkOut = false;
+        _pauseWorkOut = true;
+        _resetWorkOut = true;
+        _endWorkOut = true;
         _authState = await AuthStateProvider.GetAuthenticationStateAsync();
         if (_authState.User.Identity.IsAuthenticated)
         {
-            Guid userGuid = Guid.Parse(_authState.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)!.Value);
-            _userId = userGuid.ToString();
+            _userGuid = Guid.Parse(_authState.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)!.Value);
+            _userId = _userGuid.ToString();
+        }
+        // Hook up the elapsed event to update the UI
+        uiRefreshTimer.Elapsed += OnTimerElapsed;
+        uiRefreshTimer.AutoReset = true;
+        _starttime = TimeSpan.Zero;
+        _endtime = TimeSpan.Zero;
+
+        _viewModel ??= Activator.CreateInstance<List<TGridEntity>>();
+        GetViewModelProperties();
+        if (LoadGridData != null)
+        {
+            var dow = (await logWorkOutService.LoadDOWDataPerUserCurrentDateTime(_userId))?.FirstOrDefault();
+            if (dow != null)
+            {
+                _idValue = dow?.TemplateWorkoutId;
+                _dowId = dow.Id;
+                _viewModel = await LoadGridData((int)_idValue);
+            }
         }
 
+        foreach (var item in _viewModel)
+        {
+            if (LoadGridDetailData != null)
+            {
+                _detailCache[item] = await LoadGridDetailData(item);
+            }
+        }
+
+        _workoutText = (await logWorkOutService.LoadDOWDataPerUserCurrentDateTime(_userId)).FirstOrDefault()?.TemplateWorkout.Name ?? string.Empty;
+    }
+    private async Task Start()
+    {
+        _starttime = DateTime.Now.TimeOfDay;
+        _strtresWorkOut = true;
+        _pauseWorkOut = false;
+        _resetWorkOut = false;
+        _endWorkOut = false;
+        stopwatch.Start();
+        uiRefreshTimer.Start();
+
+        await logWorkOutService.SaveNewActualWorkOut(_userGuid, _dowId, DateTime.Now, "",true);
+
+    }
+    private void Pause()
+    {
+        stopwatch.Stop();
+        uiRefreshTimer.Stop();
+        elapsedTime = stopwatch.Elapsed;
+        _strtresWorkOut = false;
+        _pauseWorkOut = true;
+        _resetWorkOut = true;
+        _endWorkOut = true;
+        StateHasChanged(); // Force a re-render to catch the final static time
+    }
+    private async Task Reset()
+    {
+        System.Reflection.PropertyInfo idProperty;
+        int idValue;
+        var parameters = new DialogParameters<ConfirmDelete>
+        {
+            { x => x.ContentText, $"Do you really want to reset this workou? This process cannot be undone." },
+            { x => x.ButtonText, "Reset" },
+            { x => x.Color, Color.Error }
+        };
+
+        var options = new DialogOptions() { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
+
+        var dialog = await DialogService.ShowAsync<ConfirmDelete>("Delete", parameters, options);
+        var result = await dialog.Result;
+        if (!result.Canceled)
+        {
+            stopwatch.Reset();
+            uiRefreshTimer.Stop();
+            elapsedTime = TimeSpan.Zero;
+            _strtresWorkOut = false;
+            _pauseWorkOut = true;
+            _resetWorkOut = true;
+            _endWorkOut = true;
+            _starttime = TimeSpan.Zero;
+            _endtime = TimeSpan.Zero;
+            StateHasChanged();
+        }
+    }
+    private async void OnTimerElapsed(object? sender, ElapsedEventArgs e)
+    {
+        elapsedTime = stopwatch.Elapsed;
+
+        // Timer runs on a separate thread; invoke back to the UI thread safely
+        await InvokeAsync(StateHasChanged);
+    }
+    private string FormatTime()
+    {
+        // Formats into Hours : Minutes : Seconds
+        TimeSpan? duration = _endtime - _starttime;
+        return duration.Value.Seconds > 0 ? $"{duration.Value.Hours:D2}:{duration.Value.Minutes:D2}:{duration.Value.Seconds:D2}" : "00:00:00";
+    }
+    public void Dispose()
+    {
+        // Prevent memory leaks by properly tearing down resources when navigating away
+        uiRefreshTimer.Elapsed -= OnTimerElapsed;
+        uiRefreshTimer.Dispose();
+    }
+    private void GetViewModelProperties()
+    {
+        _gridHeaderproperties = typeof(TGridEntity)
+        .GetProperties()
+        .Where(p =>
+        (p.PropertyType.IsPrimitive
+        || p.PropertyType == typeof(string)
+        || p.PropertyType == typeof(DateTime)
+        || p.PropertyType.IsValueType)
+        &&
+        p.GetCustomAttribute<IgnoreInGridAttribute>() == null
+        || p.GetCustomAttribute<NavigationPropertyAttribute>() != null
+        )
+        .ToList();
+        _viewModelDetails = typeof(TGridEntityDetails)
+        .GetProperties()
+        .Where(p => p.GetCustomAttribute<IgnoreInGridAttribute>() == null
+        || p.GetCustomAttribute<CollectionAttribute>() != null)
+        .ToList();
+    }
+    private async Task SetNewDropDownValue(PropertyInfo prop, object? value, TGridEntity item)
+    {
+    }
+    public string GetDisplayText(string propName, int id)
+    {
+        return null;
+    }
+    private async Task SetNewDropDetailDownValue(PropertyInfo prop, object? value, int index, TGridEntityDetails item)
+    {
+    }
+
+    private void RemoveDetails(List<TGridEntityDetails> list, TGridEntityDetails remove)
+    {
+    }
+    private async Task EndWorkout()
+    {
+        System.Reflection.PropertyInfo idProperty;
+        int idValue;
+        var parameters = new DialogParameters<ConfirmDelete>
+        {
+            { x => x.ContentText, $"Are you ready to log your workout? Please ensure that you have recorded all your sets" },
+            { x => x.ButtonText, "Confrim" },
+            { x => x.Color, Color.Success }
+        };
+
+        var options = new DialogOptions() { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
+
+        var dialog = await DialogService.ShowAsync<ConfirmDelete>("Delete", parameters, options);
+        var result = await dialog.Result;
+        if (!result.Canceled)
+        {
+            stopwatch.Reset();
+            uiRefreshTimer.Stop();
+            _endtime = DateTime.Now.TimeOfDay;
+            StateHasChanged();
+        }
+    }
+    public async Task OnSetCompleted(bool complete)
+    {
+        await SaveWorkOutData();
     }
 
 }

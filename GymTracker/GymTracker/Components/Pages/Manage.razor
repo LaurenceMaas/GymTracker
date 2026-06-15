@@ -6,7 +6,8 @@
 @inject IWorkoutExerciseSetService workoutService
 @inject IExerciseService exerciseService
 @inject IWorkoutScheduleService workoutScheduleService
-@inject IWorkoutHistory workoutHistory
+@inject IWorkoutHistoryService workoutHistory
+@inject ILogWorkOutService logWorkOutService
 
 @if (EntityName == "exercise")
 {
@@ -60,7 +61,15 @@ else if (EntityName == "viewworkouthistory")
                 CanEditAddButton="false"
                 DisplayAddEdit="false"
                 DetailName="Workout history"
-                LoadData="@(() => workoutHistory.LoadWorkoutHistoryPerUser(_userId))" />
+    LoadData="@(() => workoutHistory.LoadWorkoutHistoryPerUser(_userId))" />
+} 
+else if (EntityName == "logworkout")
+{
+    <LogWorkout TGridEntity="LogWorkoutLogExerciseVM"
+                TGridEntityDetails="LogWorkoutSetVM"
+                LoadGridData="@(x => logWorkOutService.GetExercises(x))"
+                LoadGridDetailData="@(x => logWorkOutService.LogExerciseData(x))"
+                SaveWorkOutData="@((w,x,y,z) => logWorkOutService.SaveNewActualWorkOut(w,x,y,z))" />
 }
 
 

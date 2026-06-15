@@ -1,5 +1,4 @@
-﻿@page "/ManageGridDetails"
-@using System.Linq.Expressions;
+﻿@using System.Linq.Expressions;
 @using System.Reflection;
 @using System.ComponentModel;
 @using System.ComponentModel.DataAnnotations;
@@ -7,32 +6,35 @@
 @using System.Collections
 @typeparam TGridEntityDetails
 @inject IServiceProvider ServiceProvider
-
+@{var isReadonly = prop.GetCustomAttribute<ReadOnlyAttribute>() != null;}
 @if (isNavigation)
 {
     var fkProp = ReflectionHelper.GetForeignKeyGrid(prop);
+    
     <MudAutocomplete T="int"
                      Value="@(@FormatDetailGridValue(Detail, fkProp) is int i ? i : 0)"
                      ValueChanged="@(v => fkProp.SetValue(Detail, v))"
                      Label="@ReflectionHelper.GetDisplayName(prop)"
                      Variant="Variant.Outlined"
-                     FullWidth="true"
                      Margin="Margin.Dense"
                      SearchFunc="@( (value, token) => SearchNavData(prop, value, ServiceProvider,token) )"
                      ToStringFunc="@(id => GetDisplayText(prop.Name, id))"
                      Clearable="true"
                      MinCharacters="0"
                      OpenOnFocus="true"
-                     AdornmentIcon="@Icons.Material.Filled.Search" />
-}
+                     AdornmentIcon="@Icons.Material.Filled.Search"
+                     Style="@GeneralHelpers.GetWidth(_value?.ToString())"
+                     ReadOnly="isReadonly" />
+} 
 else if (prop.PropertyType == typeof(decimal?))
 {
+
     <MudNumericField T="decimal"
                      Value="@(_value is decimal i ? i : 0)"
                      ValueChanged="@(v => prop.SetValue(Detail, v))"
                      Variant="Variant.Outlined"
-                     FullWidth="false"
-                     Margin="Margin.Dense" />
+                     Margin="Margin.Dense"
+                     Style="@GeneralHelpers.GetWidth(_value?.ToString())" />
 }
 else if (prop.PropertyType == typeof(string))
 {
@@ -41,50 +43,57 @@ else if (prop.PropertyType == typeof(string))
                   Value="@(_value?.ToString() ?? "")"
                   ValueChanged="@(v => prop.SetValue(Detail, v))"
                   Variant="Variant.Outlined"
-                  FullWidth="true"
-                  Margin="Margin.Dense" />
+                  Margin="Margin.Dense"
+                  Style="@GeneralHelpers.GetWidth(_value?.ToString())"
+                  Lines="2"
+                  ReadOnly="isReadonly"/>
 
 }
 else if (prop.PropertyType == typeof(DateTime))
 {
+
     <MudDatePicker Date="@(_value is DateTime dt ? dt : null)"
                    DateChanged="@(v => prop.SetValue(Detail, v))"
                    Variant="Variant.Outlined"
                    Margin="Margin.Dense"
-                   Class="w-100" />
+                   Class="w-100"
+                   Style="@GeneralHelpers.GetWidth(_value?.ToString())"
+                   ReadOnly="isReadonly"/>
+}
+else if (prop.PropertyType == typeof(bool))
+{
+    bool ticked = (bool?)_value ?? false;
+    <MudCheckBox Value="ticked"
+                 Label="@ReflectionHelper.GetDisplayName(prop)"
+                 Color="Color.Primary"
+                 ValueChanged="OnSetCompleted">
+    </MudCheckBox>
 }
 else
 {
     <MudText Class="py-2">@FormatDetailValue(Detail, prop)</MudText>
-}
+} 
 
 @code {
     private object? _value { get; set; }
-
     [Parameter]
     public bool isNavigation { get; set; }
-
     [Parameter]
     public PropertyInfo? prop { get; set; }
-
     [Parameter]
     public Func<object, PropertyInfo, object>? FormatDetailGridValue { get; set; }
-
     [Parameter]
     public TGridEntityDetails? Detail { get; set; }
-
     [Parameter]
     public Func<PropertyInfo, string, IServiceProvider, CancellationToken, Task<IEnumerable<int>>>? SearchNavData { get; set; }
-
     [Parameter]
     public Func<string, int, string>? GetDisplayText { get; set; }
-
     [Parameter]
-    public Func<object , PropertyInfo, string>? FormatDetailValue { get; set; }
-
+    public Func<object, PropertyInfo, string>? FormatDetailValue { get; set; }
+    [Parameter]
+    public EventCallback<bool> OnSetCompleted { get; set; }
     protected override async Task OnInitializedAsync()
     {
-       _value =  prop?.GetValue(Detail);
+        _value = prop?.GetValue(Detail);
     }
-
 }

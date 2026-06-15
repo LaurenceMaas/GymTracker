@@ -25,6 +25,7 @@ var db = new EntityDBContext(_optionsBuilder.Options);
 //    data.Add(wgvm, await test.GetDetailDataAsync(wgvm));
 //}
 //await test.SaveExerciseSetsData(data);
-IWorkoutScheduleService test = new WorkoutScheduleService();
-var result = await test.LoadDOWDataPerUserCurrentDateTime("2b27464b-e66e-46eb-a533-b0b2b62719b6");
+ILogWorkOutService test = new LogWorkOutService(db);
+var result = await test.GetExercises(1);
+await test.LogExerciseData(result.FirstOrDefault());
 Console.WriteLine($"{result}");

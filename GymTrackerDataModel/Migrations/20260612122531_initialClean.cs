@@ -55,6 +55,19 @@ namespace GymTrackerDataModel.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "LKP_WorkOutStatus",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    Description = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_LKP_WorkOutStatus", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "LKP_WorkoutTemplate",
                 columns: table => new
                 {
@@ -181,13 +194,20 @@ namespace GymTrackerDataModel.Migrations
                     DOWWorkoutId = table.Column<int>(type: "int", nullable: false),
                     WorkoutStartDate = table.Column<DateTime>(type: "datetime2", nullable: false),
                     WorkoutStartTime = table.Column<TimeSpan>(type: "time", nullable: false),
-                    WorkoutEndDate = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    WorkoutEndTime = table.Column<TimeSpan>(type: "time", nullable: false),
-                    Notes = table.Column<string>(type: "nvarchar(1024)", maxLength: 1024, nullable: true)
+                    WorkoutEndDate = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    WorkoutEndTime = table.Column<TimeSpan>(type: "time", nullable: true),
+                    Notes = table.Column<string>(type: "nvarchar(1024)", maxLength: 1024, nullable: true),
+                    WorkOutStatusId = table.Column<int>(type: "int", nullable: false)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_TRN_ActualWorkout", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_TRN_ActualWorkout_LKP_WorkOutStatus_WorkOutStatusId",
+                        column: x => x.WorkOutStatusId,
+                        principalTable: "LKP_WorkOutStatus",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
                         name: "FK_TRN_ActualWorkout_TRN_DOWWorkout_DOWWorkoutId",
                         column: x => x.DOWWorkoutId,
@@ -418,6 +438,11 @@ namespace GymTrackerDataModel.Migrations
                 column: "DOWWorkoutId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_TRN_ActualWorkout_WorkOutStatusId",
+                table: "TRN_ActualWorkout",
+                column: "WorkOutStatusId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_TRN_DOWWorkout_TemplateWorkoutId",
                 table: "TRN_DOWWorkout",
                 column: "TemplateWorkoutId");
@@ -460,6 +485,9 @@ namespace GymTrackerDataModel.Migrations
 
             migrationBuilder.DropTable(
                 name: "LKP_Exercise");
+
+            migrationBuilder.DropTable(
+                name: "LKP_WorkOutStatus");
 
             migrationBuilder.DropTable(
                 name: "TRN_DOWWorkout");

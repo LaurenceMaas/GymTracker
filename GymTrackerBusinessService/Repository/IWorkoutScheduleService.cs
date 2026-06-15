@@ -15,7 +15,7 @@ namespace GymTrackerBusinessService.Repository
     {
         Task SaveWorkoutScheduleData(DOWWorkout dowWorkout,string userId);
         Task<List<DOWWorkout>> LoadDOWDataPerUser(string UserId);
-        Task<List<DOWWorkout>> LoadDOWDataPerUserCurrentDateTime(string UserId);
+
     }
 
     public class WorkoutScheduleService : IWorkoutScheduleService
@@ -48,16 +48,6 @@ namespace GymTrackerBusinessService.Repository
             }
         }
 
-        public async Task<List<DOWWorkout>> LoadDOWDataPerUserCurrentDateTime(string UserId)
-        {
-            _optionsBuilder = Helpers.BuildOptions();
-            DayOfWeek currentDOW = DateTime.Now.DayOfWeek;
-            TimeSpan currentTime = DateTime.Now.TimeOfDay;
-            IGenericRepoService<DOWWorkout> genericRepoService = new GenericRepoService<DOWWorkout>(new EntityDBContext(_optionsBuilder.Options));
-            return (await genericRepoService.GetAllAsync()).ToList().FindAll(x => x.UserId.ToString().Equals(UserId)
-            && x.WorkoutPeriod.StartTime.CompareTo(currentTime) < 0
-            && x.WorkoutPeriod.EndTime.CompareTo(currentTime) >= 0
-            && x.DayOfWeek == currentDOW).ToList() ?? new List<DOWWorkout>();            
-        }
+
     }
 }

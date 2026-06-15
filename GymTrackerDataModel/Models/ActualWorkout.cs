@@ -24,9 +24,11 @@ namespace GymTrackerDataModel.Models
         public DOWWorkout? DOWWorkout { get; set; }
         public DateTime WorkoutStartDate { get; set; }
         public TimeSpan WorkoutStartTime { get; set; }
-        public DateTime WorkoutEndDate { get; set; }
-        public TimeSpan WorkoutEndTime { get; set; }
+        public DateTime? WorkoutEndDate { get; set; }
+        public TimeSpan? WorkoutEndTime { get; set; }
         [MaxLength(1024)]
         public string? Notes { get; set; }
+        public int WorkOutStatusId { get; set; }
+        public WorkOutStatus WorkOutStatus { get; set; }
     }
 }

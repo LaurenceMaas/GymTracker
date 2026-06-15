@@ -359,6 +359,17 @@ void CreateSeedData(EntityDBContext context)
         context.SaveChanges();
     }
 
+    if (!context.LKP_WorkOutStatus.Any(d => d.Id == 1))
+    {
+        DbSet<WorkOutStatus> workOutStatus = context.LKP_WorkOutStatus;
+        workOutStatus.AddRange(
+        new WorkOutStatus { Description = "Started" },
+        new WorkOutStatus { Description = "Abandoned" },
+        new WorkOutStatus { Description = "Ended" }
+        );
+        context.SaveChanges();
+    }
+
 }
 
 void ApplyMigrations()

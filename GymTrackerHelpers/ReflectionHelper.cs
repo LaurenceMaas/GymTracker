@@ -18,6 +18,7 @@ using Microsoft.Extensions.DependencyInjection;
 using GymTrackerBusinessService.Generic;
 using System.Collections;
 using System.Xml.Linq;
+using GymTrackerBusinessService.Repository;
 
 namespace GymTrackerHelpers
 {
@@ -36,6 +37,16 @@ namespace GymTrackerHelpers
             }
 
             return prop.Name;
+        }
+
+        public static string GetDisplayName(object obj, PropertyInfo prop)
+        {
+            if (obj is IDynamicDisplayName dynamicDisplay)
+            {
+                return dynamicDisplay.GetDisplayName(prop);
+            }
+
+            return GetDisplayName(prop);
         }
         public static object? GetValue<TEntity>(TEntity item, PropertyInfo prop)
         {
@@ -157,7 +168,6 @@ namespace GymTrackerHelpers
 
             return value ?? null;
         }
-
         public static async Task<IEnumerable<int>> SearchNavData(PropertyInfo prop, string value, IServiceProvider serviceProvider, CancellationToken token)
         {
             var items = await GetNavigationData(prop, serviceProvider);
@@ -204,7 +214,6 @@ namespace GymTrackerHelpers
 
             return value?.ToString() ?? string.Empty;
         }
-
     }
 
 }

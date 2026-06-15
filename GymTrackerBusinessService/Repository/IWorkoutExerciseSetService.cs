@@ -50,6 +50,7 @@ namespace GymTrackerBusinessService.Repository
         [NavigationProperty(typeof(Exercise), TextField = "Name")]
         public Exercise? Exercise { get; set; }
     }
+
     public class WorkoutSetVM
     {
         [IgnoreInGrid]
@@ -81,7 +82,7 @@ namespace GymTrackerBusinessService.Repository
         protected DbSet<TemplateSetMetric> _tsmtable = null;
         protected DbSet<Metric> _mtable = null;
         protected DbSet<ExerciseType> _ettable = null;
-        protected DbContextOptionsBuilder<EntityDBContext> _optionsBuilder;
+        protected DbContextOptionsBuilder<EntityDBContext>? _optionsBuilder;
 
         public WorkoutExerciseSetService(EntityDBContext context)
         {
@@ -453,5 +454,6 @@ namespace GymTrackerBusinessService.Repository
 
             return sets;
         }
+
     }
 }
