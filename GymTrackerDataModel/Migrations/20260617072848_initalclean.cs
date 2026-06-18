@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace GymTrackerDataModel.Migrations
 {
     /// <inheritdoc />
-    public partial class initialClean : Migration
+    public partial class initalclean : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -245,8 +245,7 @@ namespace GymTrackerDataModel.Migrations
                     ActualWorkoutId = table.Column<int>(type: "int", nullable: false),
                     TemplateExerciseId = table.Column<int>(type: "int", nullable: false),
                     ActualTemplateExerciseId = table.Column<int>(type: "int", nullable: false),
-                    Createdatetime = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    Notes = table.Column<string>(type: "nvarchar(1024)", maxLength: 1024, nullable: true)
+                    Createdatetime = table.Column<DateTime>(type: "datetime2", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -308,8 +307,8 @@ namespace GymTrackerDataModel.Migrations
                     ActualExerciseId = table.Column<int>(type: "int", nullable: false),
                     TemplateSetId = table.Column<int>(type: "int", nullable: false),
                     ExecutionOrder = table.Column<int>(type: "int", nullable: false),
-                    Createdatetime = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    Notes = table.Column<string>(type: "nvarchar(1024)", maxLength: 1024, nullable: true)
+                    Completed = table.Column<bool>(type: "bit", nullable: false),
+                    Createdatetime = table.Column<DateTime>(type: "datetime2", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -340,8 +339,7 @@ namespace GymTrackerDataModel.Migrations
                     PlannedNumericValue = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
                     ActualTextValue = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: true),
                     ActualNumericValue = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
-                    Createdatetime = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    Notes = table.Column<string>(type: "nvarchar(1024)", maxLength: 1024, nullable: true)
+                    Createdatetime = table.Column<DateTime>(type: "datetime2", nullable: false)
                 },
                 constraints: table =>
                 {

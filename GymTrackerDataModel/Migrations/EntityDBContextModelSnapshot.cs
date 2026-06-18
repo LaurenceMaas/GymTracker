@@ -39,10 +39,6 @@ namespace GymTrackerDataModel.Migrations
                     b.Property<DateTime>("Createdatetime")
                         .HasColumnType("datetime2");
 
-                    b.Property<string>("Notes")
-                        .HasMaxLength(1024)
-                        .HasColumnType("nvarchar(1024)");
-
                     b.Property<int>("TemplateExerciseId")
                         .HasColumnType("int");
 
@@ -68,15 +64,14 @@ namespace GymTrackerDataModel.Migrations
                     b.Property<int>("ActualExerciseId")
                         .HasColumnType("int");
 
+                    b.Property<bool>("Completed")
+                        .HasColumnType("bit");
+
                     b.Property<DateTime>("Createdatetime")
                         .HasColumnType("datetime2");
 
                     b.Property<int>("ExecutionOrder")
                         .HasColumnType("int");
-
-                    b.Property<string>("Notes")
-                        .HasMaxLength(1024)
-                        .HasColumnType("nvarchar(1024)");
 
                     b.Property<int>("TemplateSetId")
                         .HasColumnType("int");
@@ -110,10 +105,6 @@ namespace GymTrackerDataModel.Migrations
 
                     b.Property<DateTime>("Createdatetime")
                         .HasColumnType("datetime2");
-
-                    b.Property<string>("Notes")
-                        .HasMaxLength(1024)
-                        .HasColumnType("nvarchar(1024)");
 
                     b.Property<decimal>("PlannedNumericValue")
                         .HasColumnType("decimal(18,2)");

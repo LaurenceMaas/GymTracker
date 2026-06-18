@@ -2,10 +2,13 @@
 using GymTrackerDataModel;
 using GymTrackerDataModel.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Internal;
+using Microsoft.Extensions.Options;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
 using System.Reflection;
 using System.Text;
@@ -17,8 +20,12 @@ namespace GymTrackerBusinessService.Repository
     {
         Task<List<DOWWorkout>> LoadDOWDataPerUserCurrentDateTime(string UserId);
         Task<List<LogWorkoutLogExerciseVM>> GetExercises(int workOutTemplateId);
-        Task<List<LogWorkoutSetVM>> LogExerciseData(LogWorkoutLogExerciseVM workoutLogExerciseVM);
-        Task SaveNewActualWorkOut(Guid user,int DOWWorkoutId,DateTime startDateTime,string? notes);
+        Task<List<LogWorkoutSetVM>> GetExerciseData(LogWorkoutLogExerciseVM workoutLogExerciseVM);
+        Task<int> SaveNewActualWorkOut(Guid user,int DOWWorkoutId,DateTime startDateTime,string? notes);
+        Task ResetActualWorkOut(Guid user);
+        ActualWorkout GetCurrentWorkout(Guid user);
+        Task CompleteSet(LogWorkoutSetVM set, int actualWOId);
+        Task CompleteWorkout(int actualWOId);
     }
     public interface IDynamicDisplayName
     {
@@ -32,10 +39,11 @@ namespace GymTrackerBusinessService.Repository
         public int ExerciseNumber { get; set; }
         [ReadOnly(true)]
         public string? ExerciseName { get; set; }
-        public string? Notes { get; set; }
     }
     public class LogWorkoutSetVM
     {
+        [IgnoreInGrid]
+        public int TemplateExerciseId { get; set; }
         [IgnoreInGrid]
         public int TemplateSetId { get; set; }
         public int SetNumber { get; set; }
@@ -44,11 +52,13 @@ namespace GymTrackerBusinessService.Repository
         [Collection]
         public List<LogWorkoutSetMetricVM>? LogWorkoutSetMetricVMs { get; set; }
         public bool Complete { get; set; }
+        [IgnoreInGrid]
+        public int Order { get; set; }
     }
     public class LogWorkoutSetMetricVM : IDynamicDisplayName
     {        
         [IgnoreInGrid]
-        public int TemplateSetId { get; set; }
+        public int TemplateSetMetricId { get; set; }
         [IgnoreInGrid]
         public int MetricId { get; set; }
         [IgnoreInGrid]
@@ -96,7 +106,15 @@ namespace GymTrackerBusinessService.Repository
         protected DbSet<TemplateSetMetric> _tsmtable = null;
         protected DbSet<Metric> _mtable = null;
         protected DbSet<ExerciseType> _ettable = null;
+        protected DbSet<ActualWorkout> _awtable = null;
+        protected DbSet<DOWWorkout> _dwtable = null;
+        protected DbSet<WorkoutPeriod> _wptable = null;
+        protected DbSet<ActualExercise> _aetable = null;
+        protected DbSet<ActualSet> _astable = null;
+        protected DbSet<ActualSetMetric> _amtable = null;
+
         protected DbContextOptionsBuilder<EntityDBContext>? _optionsBuilder;
+
         public LogWorkOutService(EntityDBContext context)
         {
             _context = context;
@@ -107,6 +125,12 @@ namespace GymTrackerBusinessService.Repository
             _tsmtable = _context.Set<TemplateSetMetric>();
             _mtable = _context.Set<Metric>();
             _ettable = _context.Set<ExerciseType>();
+            _awtable= _context.Set<ActualWorkout>();
+            _aetable = _context.Set<ActualExercise>();
+            _dwtable = _context.Set<DOWWorkout>();
+            _wptable = _context.Set<WorkoutPeriod>();
+            _astable = _context.Set<ActualSet>();
+            _amtable = _context.Set<ActualSetMetric>();
         }
         public async Task<List<LogWorkoutLogExerciseVM>> GetExercises(int workOutTemplateId)
         {
@@ -151,14 +175,15 @@ namespace GymTrackerBusinessService.Repository
 
             return result ?? new List<LogWorkoutLogExerciseVM>();
         }
-        public async Task<List<LogWorkoutSetVM>> LogExerciseData(LogWorkoutLogExerciseVM workoutLogExerciseVM)
+        public async Task<List<LogWorkoutSetVM>> GetExerciseData(LogWorkoutLogExerciseVM workoutLogExerciseVM)
         {
             StringBuilder plannedSB = new StringBuilder();
             int cnt;
-            string at = string.Empty; 
+            string at = string.Empty;
             string planned = string.Empty;
+            LogWorkoutSetVM logWorkoutSetVM;
 
-            var rawData = (await
+            var rdbData = (await
             (
             from templateSet in _tstable
             join templateSetMetric in _tsmtable on templateSet.Id equals templateSetMetric.TemplateSetId
@@ -166,24 +191,30 @@ namespace GymTrackerBusinessService.Repository
             where templateSet.TemplateExerciseId == workoutLogExerciseVM.TemplateExerciseId
             select new
             {
+                TemplateExerciseId = templateSet.TemplateExerciseId,
                 TemplateSetId = templateSet.Id,
                 MetricId = metric.Id,
                 MetricName = metric.Name,
                 NumericValue = templateSetMetric.NumericValue,
                 TextValue = templateSetMetric.TextValue,
-                Unit = metric.Unit
+                Unit = metric.Unit,
+                Order = templateSet.Order,
+                TemplateSetMetricId = templateSetMetric.Id
             }
             ).ToListAsync());
 
-            var formattedData = rawData
+            var formattedData = rdbData
             .GroupBy(x => new
             {
                 x.TemplateSetId,
+                x.TemplateExerciseId,
+                x.Order               
             })
             .Select(g => new LogWorkoutSetVM
             {
                 TemplateSetId = g.Key.TemplateSetId,
-
+                TemplateExerciseId = g.Key.TemplateExerciseId,
+                Order = g.Key.Order,
                 LogWorkoutSetMetricVMs = g.Select(m => new LogWorkoutSetMetricVM
                 {
                     MetricId = m.MetricId,
@@ -191,13 +222,13 @@ namespace GymTrackerBusinessService.Repository
                     MetricName = m.MetricName,
                     PlannedNumericValue = m.NumericValue,
                     PlannedTextValue = m.TextValue,
-                    TemplateSetId = m.TemplateSetId,
-                    ActualNumericValue = 0,
-                    ActualTextValue = "",
+                    TemplateSetMetricId = m.TemplateSetMetricId,
+                    ActualNumericValue = m.NumericValue,
+                    ActualTextValue = m.TextValue,
                     ActualLabel =
-        m.NumericValue != null
-        ? $"{m.MetricName} ({m.NumericValue}{m.Unit})"
-        : $"{m.MetricName} ({m.TextValue})"
+                        m.NumericValue != null
+                        ? $"{m.MetricName} ({m.NumericValue}{m.Unit})"
+                        : $"{m.MetricName} ({m.TextValue})"
                 }).ToList()
             })
             .OrderBy(x => x.SetNumber)
@@ -208,24 +239,51 @@ namespace GymTrackerBusinessService.Repository
                 plannedSB.Clear();
                 formattedData.ElementAt(i).SetNumber = (i + 1);
                 cnt = 1;
-                foreach(var setMetric in formattedData.ElementAt(i).LogWorkoutSetMetricVMs)
+                logWorkoutSetVM = formattedData.ElementAt(i);
+                foreach (var setMetric in logWorkoutSetVM.LogWorkoutSetMetricVMs)
                 {
                     at = cnt == formattedData.ElementAt(i).LogWorkoutSetMetricVMs.Count ? "" : " @\r\n";
-                    plannedSB.Append((setMetric.PlannedNumericValue != null ? setMetric.PlannedNumericValue : "" + setMetric.PlannedTextValue) + " " + setMetric.Unit + " " + setMetric.MetricName + at );
+                    plannedSB.Append((setMetric.PlannedNumericValue != null ? setMetric.PlannedNumericValue : "" + setMetric.PlannedTextValue) + " " + setMetric.Unit + " " + setMetric.MetricName + at);
+
+                    var actualSetMetric = (await
+                    (from actualMet in _amtable
+                     where (actualMet.TemplateSetMetricId == setMetric.TemplateSetMetricId)
+                     select new
+                     {
+                         ActualNumericValue = actualMet.ActualNumericValue,
+                         ActualTextValue = actualMet.ActualTextValue
+                     }
+                    ).ToListAsync()).FirstOrDefault() ?? null;
+
+                    if (actualSetMetric != null)
+                    {
+                        setMetric.ActualNumericValue = actualSetMetric.ActualNumericValue;
+                        setMetric.ActualTextValue = actualSetMetric.ActualTextValue;
+                    }
                     cnt++;
                 }
 
-                formattedData.ElementAt(i).PlannedSetMetrics = plannedSB.ToString();
+                var readComplete = (await (from actualSet in _astable
+                                           where actualSet.TemplateSetId == logWorkoutSetVM.TemplateSetId
+                                           select new
+                                           {
+                                               Completed = actualSet.Completed
+                                           }
+                ).ToListAsync()).FirstOrDefault();
+
+                logWorkoutSetVM.Complete = readComplete == null ? false : readComplete.Completed;
+                logWorkoutSetVM.PlannedSetMetrics = plannedSB.ToString();
             }
 
             return formattedData;
         }
-        public async Task SaveNewActualWorkOut(Guid user, int DOWWorkoutId, DateTime startDateTime, string? notes, bool completed)
+        public async Task<int> SaveNewActualWorkOut(Guid user, int DOWWorkoutId, DateTime startDateTime, string? notes)
         {
-            if (completed)
+            _optionsBuilder = Helpers.BuildOptions();
+            IGenericRepoService<ActualWorkout> genericRepoService = new GenericRepoService<ActualWorkout>(new EntityDBContext(_optionsBuilder.Options));
+            int woId = GetCurrentWorkout(user).Id;
+            if (woId == 0)
             {
-                _optionsBuilder = Helpers.BuildOptions();
-                IGenericRepoService<ActualWorkout> genericRepoService = new GenericRepoService<ActualWorkout>(new EntityDBContext(_optionsBuilder.Options));
                 ActualWorkout actualWorkoutSave = new ActualWorkout()
                 {
                     Id = 0,
@@ -240,8 +298,71 @@ namespace GymTrackerBusinessService.Repository
 
                 };
 
-                await genericRepoService.InsertAsync(actualWorkoutSave);
+                return await genericRepoService.InsertAsync(actualWorkoutSave);
             }
+            else
+            {
+                return woId;
+            }
+        }
+        public async Task ResetActualWorkOut(Guid user)
+        {
+            ActualWorkout actualWorkout;
+            _optionsBuilder = Helpers.BuildOptions();
+            IGenericRepoService<ActualWorkout> genericRepoService = new GenericRepoService<ActualWorkout>(new EntityDBContext(_optionsBuilder.Options));
+            int workoputId = GetCurrentWorkout(user).Id;
+            List<int> exerciseIds;
+            List<int> setIds;
+
+            if (workoputId > 0)
+            {
+                actualWorkout = await genericRepoService.GetByIdAsync(workoputId);
+                actualWorkout.WorkOutStatusId = (int)workoutStatus.Abandoned;
+                await genericRepoService.UpdateAsync(actualWorkout);
+
+                var exercises = _context.TRN_ActualExercise.Where(x => x.ActualWorkoutId == actualWorkout.Id);
+                exerciseIds = await exercises.Select(x => x.Id).ToListAsync();
+                var sets = _context.TRN_ActualSet.Where(x => exerciseIds.Any(y => y == x.ActualExerciseId));
+                setIds = await sets.Select(z => z.Id).ToListAsync();
+
+                await exercises.ExecuteDeleteAsync();               
+                await sets.ExecuteDeleteAsync();
+                await _context.TRN_ActualSetMetric.Where(x => setIds.Any(y => y == x.ActualSetId)).ExecuteDeleteAsync();
+            }
+        }
+        public ActualWorkout GetCurrentWorkout(Guid user)
+        {
+            int workoutPeriod = (from woPeriod in _wptable
+                                 where DateTime.Now.TimeOfDay >= woPeriod.StartTime
+                                 && DateTime.Now.TimeOfDay < woPeriod.EndTime
+                                 select new
+                                 {
+                                     Id = woPeriod.Id
+                                 }).ToList().FirstOrDefault().Id;
+
+            var queryRes =
+            (
+            from actualWorkout in _awtable
+            join dowworkout in _dwtable on actualWorkout.DOWWorkoutId equals dowworkout.Id
+            where actualWorkout.PerformedByUserId == user
+            && DateOnly.FromDateTime(actualWorkout.WorkoutStartDate) == DateOnly.FromDateTime(DateTime.Now)
+            && actualWorkout.WorkOutStatusId == (int)workoutStatus.Started
+            && dowworkout.WorkoutPeriodId == workoutPeriod
+            select new ActualWorkout
+            {
+                Id = actualWorkout.Id,
+                PerformedByUserId = actualWorkout.PerformedByUserId,
+                DOWWorkoutId = actualWorkout.DOWWorkoutId,
+                WorkoutStartDate = actualWorkout.WorkoutStartDate,
+                WorkoutStartTime = actualWorkout.WorkoutStartTime,
+                WorkoutEndDate = actualWorkout.WorkoutEndDate,
+                WorkoutEndTime = actualWorkout.WorkoutEndTime,
+                Notes = actualWorkout.Notes,
+                WorkOutStatusId = actualWorkout.WorkOutStatusId
+            }
+            ).ToList();
+
+            return queryRes.Count == 0 ? new ActualWorkout() : queryRes.FirstOrDefault();
         }
         public async Task<List<DOWWorkout>> LoadDOWDataPerUserCurrentDateTime(string UserId)
         {
@@ -254,11 +375,133 @@ namespace GymTrackerBusinessService.Repository
             && x.WorkoutPeriod.EndTime.CompareTo(currentTime) >= 0
             && x.DayOfWeek == currentDOW).ToList() ?? new List<DOWWorkout>();
         }
-    }
+        public async Task CompleteSet(LogWorkoutSetVM set,int actualWOId)
+        {
+            _optionsBuilder = Helpers.BuildOptions();
+            IGenericRepoService<ActualExercise> actExRepoServ = new GenericRepoService<ActualExercise>(new EntityDBContext(_optionsBuilder.Options));
+            IGenericRepoService<ActualSet> actSetRepoServ = new GenericRepoService<ActualSet>(new EntityDBContext(_optionsBuilder.Options));
+            IGenericRepoService<ActualSetMetric> actSetMetRepoServ = new GenericRepoService<ActualSetMetric>(new EntityDBContext(_optionsBuilder.Options));
 
+            var existingActExercise = (
+            await
+            (
+            from actExercises in _aetable
+            where actExercises.TemplateExerciseId == set.TemplateExerciseId && actExercises.ActualWorkoutId == actualWOId
+            select new
+            {
+                Id = actExercises.Id,
+            }
+            ).ToListAsync()).FirstOrDefault()
+            ?? new
+            {
+                Id = 0
+            };
+
+            ActualExercise actExercise = new ActualExercise()
+            {
+                Id = existingActExercise.Id,
+                TemplateExerciseId = set.TemplateExerciseId,
+                ActualTemplateExerciseId = set.TemplateExerciseId,
+                ActualWorkoutId = actualWOId,
+                Createdatetime = DateTime.Now
+            };
+
+            if (actExercise.Id == 0)
+            {
+                await actExRepoServ.InsertAsync(actExercise);
+            }
+            else
+            {
+                await actExRepoServ.UpdateAsync(actExercise);
+            }
+
+            var existingActSet = (
+            await
+            (
+            from actSet in _astable
+            where actSet.ActualExerciseId == actExercise.Id && actSet.ExecutionOrder == set.Order
+            select new
+            {
+                Id = actSet.Id,
+            }
+            ).ToListAsync()).FirstOrDefault()
+            ?? new
+            {
+                Id = 0
+            };
+
+            ActualSet actualSet = new ActualSet()
+            {
+                Id = existingActSet.Id,
+                ActualExerciseId = actExercise.Id,
+                TemplateSetId = set.TemplateSetId,
+                ExecutionOrder = set.Order,
+                Completed = set.Complete,
+                Createdatetime = DateTime.Now
+            };
+
+            if (actualSet.Id == 0)
+            {
+                actualSet.Id =  await actSetRepoServ.InsertAsync(actualSet);
+            }
+            else
+            {
+                await actSetRepoServ.UpdateAsync(actualSet);
+            }
+
+            if (set.LogWorkoutSetMetricVMs != null && set.Complete)
+            {
+
+                foreach (var metric in set.LogWorkoutSetMetricVMs)
+                {
+                    var existingMetric = (await
+                    (
+                    from actMetric in _amtable
+                    where (metric.TemplateSetMetricId == actMetric.TemplateSetMetricId)
+                    select new
+                    {
+                        Id = actMetric.Id
+                    }
+                    ).ToListAsync()).FirstOrDefault() ?? new
+                    {
+                        Id = 0
+                    };
+
+                    ActualSetMetric metricSave = new ActualSetMetric()
+                    {
+                        Id = existingMetric.Id,
+                        ActualSetId = actualSet.Id,
+                        TemplateSetMetricId = metric.TemplateSetMetricId,
+                        PlannedTextValue = metric.PlannedTextValue,
+                        PlannedNumericValue = metric.PlannedNumericValue ?? 0,
+                        ActualTextValue = metric.ActualTextValue,
+                        ActualNumericValue = metric.ActualNumericValue ?? 0,
+                        Createdatetime = DateTime.Now
+                    };
+
+                    if (metricSave.Id == 0)
+                    {
+                        metricSave.Id = await actSetMetRepoServ.InsertAsync(metricSave);
+                    }
+                    else
+                    {
+                        await actSetMetRepoServ.UpdateAsync(metricSave);
+                    }
+                }
+            }
+        }
+        public async Task CompleteWorkout(int actualWOId)
+        {
+            _optionsBuilder = Helpers.BuildOptions();
+            IGenericRepoService<ActualWorkout> genericRepoService = new GenericRepoService<ActualWorkout>(new EntityDBContext(_optionsBuilder.Options));
+            ActualWorkout aw = await genericRepoService.GetByIdAsync(actualWOId);
+            aw.WorkOutStatusId = (int)workoutStatus.Ended;
+            await genericRepoService.UpdateAsync(aw);
+        }
+    }
     public enum workoutStatus
     {
-        Started =1,
+        Started = 1,
         Abandoned=2,
         Ended=3
     }

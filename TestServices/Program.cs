@@ -27,5 +27,5 @@ var db = new EntityDBContext(_optionsBuilder.Options);
 //await test.SaveExerciseSetsData(data);
 ILogWorkOutService test = new LogWorkOutService(db);
 var result = await test.GetExercises(1);
-await test.LogExerciseData(result.FirstOrDefault());
+var sets = await test.GetExerciseData(result.ElementAt(0));
 Console.WriteLine($"{result}");

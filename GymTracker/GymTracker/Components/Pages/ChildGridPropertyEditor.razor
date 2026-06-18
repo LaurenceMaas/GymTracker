@@ -132,7 +132,7 @@ else
     [Parameter]
     public PropertyInfo? prop { get; set; }
     [Parameter]
-    public EventCallback<bool> OnSetCompleted { get; set; }
+    public EventCallback<TGridEntityDetails> OnSetCompleted { get; set; }
     [Parameter]
     public bool canDelete { get; set; } = true;
 }

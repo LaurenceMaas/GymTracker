@@ -18,8 +18,7 @@ namespace GymTrackerDataModel.Models
         public int TemplateSetId { get; set; }
         public TemplateSet? TemplateSet { get; set; }
         public int ExecutionOrder { get; set; }
+        public bool Completed { get; set; }
         public DateTime Createdatetime { get; set; }
-        [MaxLength(1024)]
-        public string? Notes { get; set; }
     }
 }

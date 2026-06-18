@@ -20,7 +20,5 @@ namespace GymTrackerDataModel.Models
         public int ActualTemplateExerciseId { get; set; }
         public TemplateExercise? ActualTemplateExercise { get; set; }
         public DateTime Createdatetime { get; set; }
-        [MaxLength(1024)]
-        public string? Notes { get; set; }
     }
 }

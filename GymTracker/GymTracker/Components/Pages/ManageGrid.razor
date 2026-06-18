@@ -191,7 +191,7 @@
             { "SaveDetailData", SaveDetailData },
             { "SaveGridDetailData", SaveGridDetailData }
         };
-        var dialog = await DialogService.ShowAsync<Upsert<TEntity, TGridEntity, TGridEntityDetails>>($"Add/Edit {EntityName}", parameters, options);
+        var dialog = await DialogService.ShowAsync<UpsertGridData<TEntity, TGridEntity, TGridEntityDetails>>($"Add/Edit {EntityName}", parameters, options);
 
         var result = await dialog.Result;
 

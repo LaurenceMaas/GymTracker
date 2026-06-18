@@ -25,7 +25,6 @@ namespace GymTrackerDataModel.Models
         public string? ActualTextValue { get; set; }
         public decimal ActualNumericValue { get; set; }
         public DateTime Createdatetime { get; set; }
-        [MaxLength(1024)]
-        public string? Notes { get; set; }
+
     }
 }

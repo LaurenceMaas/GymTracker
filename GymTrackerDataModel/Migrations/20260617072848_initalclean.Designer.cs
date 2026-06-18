@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace GymTrackerDataModel.Migrations
 {
     [DbContext(typeof(EntityDBContext))]
-    [Migration("20260612122531_initialClean")]
-    partial class initialClean
+    [Migration("20260617072848_initalclean")]
+    partial class initalclean
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -42,10 +42,6 @@ namespace GymTrackerDataModel.Migrations
                     b.Property<DateTime>("Createdatetime")
                         .HasColumnType("datetime2");
 
-                    b.Property<string>("Notes")
-                        .HasMaxLength(1024)
-                        .HasColumnType("nvarchar(1024)");
-
                     b.Property<int>("TemplateExerciseId")
                         .HasColumnType("int");
 
@@ -71,15 +67,14 @@ namespace GymTrackerDataModel.Migrations
                     b.Property<int>("ActualExerciseId")
                         .HasColumnType("int");
 
+                    b.Property<bool>("Completed")
+                        .HasColumnType("bit");
+
                     b.Property<DateTime>("Createdatetime")
                         .HasColumnType("datetime2");
 
                     b.Property<int>("ExecutionOrder")
                         .HasColumnType("int");
-
-                    b.Property<string>("Notes")
-                        .HasMaxLength(1024)
-                        .HasColumnType("nvarchar(1024)");
 
                     b.Property<int>("TemplateSetId")
                         .HasColumnType("int");
@@ -113,10 +108,6 @@ namespace GymTrackerDataModel.Migrations
 
                     b.Property<DateTime>("Createdatetime")
                         .HasColumnType("datetime2");
-
-                    b.Property<string>("Notes")
-                        .HasMaxLength(1024)
-                        .HasColumnType("nvarchar(1024)");
 
                     b.Property<decimal>("PlannedNumericValue")
                         .HasColumnType("decimal(18,2)");

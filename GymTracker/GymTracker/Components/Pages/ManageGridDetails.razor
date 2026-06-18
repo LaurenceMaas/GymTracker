@@ -63,10 +63,14 @@ else if (prop.PropertyType == typeof(DateTime))
 else if (prop.PropertyType == typeof(bool))
 {
     bool ticked = (bool?)_value ?? false;
-    <MudCheckBox Value="ticked"
+    <MudCheckBox T="bool" Value="ticked"
                  Label="@ReflectionHelper.GetDisplayName(prop)"
                  Color="Color.Primary"
-                 ValueChanged="OnSetCompleted">
+                 ValueChanged="@(async value =>
+                {
+                    prop.SetValue(Detail, value);
+                    await OnSetCompleted.InvokeAsync(Detail);
+                })">
     </MudCheckBox>
 }
 else
@@ -91,7 +95,7 @@ else
     [Parameter]
     public Func<object, PropertyInfo, string>? FormatDetailValue { get; set; }
     [Parameter]
-    public EventCallback<bool> OnSetCompleted { get; set; }
+    public EventCallback<TGridEntityDetails?> OnSetCompleted { get; set; }
     protected override async Task OnInitializedAsync()
     {
         _value = prop?.GetValue(Detail);

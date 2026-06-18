@@ -40,7 +40,7 @@
 
         </MudStack>
 
-        @if (_viewModel.Count > 0)
+        @if (_viewModel.Count > 0 && _displaygrid)
         {
             <MudPaper Outlined="true" Class="pa-4 mt-4">
 
@@ -129,10 +129,8 @@
                         </MudPaper>
                     </ChildRowContent>
                 </MudDataGrid>
-
             </MudPaper>
         }
-
     </MudPaper>
     @if (_viewModel.Count > 0)
     {
@@ -164,6 +162,10 @@
     }
 </MudPaper>
 
+ <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center">
+    <MudTextField @bind-Value="_notes" Style="width:50rem" T="string" Lines="2" Label="Notes" />
+</MudStack>
+
 @code {
 
     [Parameter]
@@ -173,7 +175,7 @@
     [Parameter]
     public Func<int, Task<List<TGridEntity>>>? LoadGridData { get; set; }
     [Parameter]
-    public Func<Guid,int,DateTime,string?,Task >? SaveWorkOutData { get; set; }
+    public Func<TGridEntityDetails, int, Task>? CompleteSet { get; set; }
 
     private Dictionary<string, IEnumerable<object>> _navData = new();
     private Dictionary<object, List<TGridEntityDetails>> _detailCache = new();
@@ -188,7 +190,7 @@
     private Timer uiRefreshTimer = new Timer(1000); // Updates every second for smooth tracking
     private TimeSpan elapsedTime = TimeSpan.Zero;
     private bool isRunning => stopwatch.IsRunning;
-    private TimeSpan? _starttime;
+    private TimeSpan? _starttime { get; set; } = null;
     private TimeSpan? _endtime;
     private MudDataGrid<TGridEntity> _grid = default!;
     private List<TGridEntity>? _viewModel { get; set; }
@@ -199,9 +201,15 @@
     private bool _endWorkOut { get; set; }
     private int? _idValue { get; set; }
     private int _dowId { get; set; }
+    private string? _notes { get; set; }
+    private bool _displaygrid { get; set; } = false;
+    private ActualWorkout _aw { get; set; } = null;
+    private int _woId { get; set; } = 0;
 
     protected override async Task OnInitializedAsync()
     {
+        DOWWorkout dow = null;
+
         _strtresWorkOut = false;
         _pauseWorkOut = true;
         _resetWorkOut = true;
@@ -222,7 +230,7 @@
         GetViewModelProperties();
         if (LoadGridData != null)
         {
-            var dow = (await logWorkOutService.LoadDOWDataPerUserCurrentDateTime(_userId))?.FirstOrDefault();
+            dow = (await logWorkOutService.LoadDOWDataPerUserCurrentDateTime(_userId))?.FirstOrDefault();
             if (dow != null)
             {
                 _idValue = dow?.TemplateWorkoutId;
@@ -230,7 +238,6 @@
                 _viewModel = await LoadGridData((int)_idValue);
             }
         }
-
         foreach (var item in _viewModel)
         {
             if (LoadGridDetailData != null)
@@ -239,19 +246,27 @@
             }
         }
 
-        _workoutText = (await logWorkOutService.LoadDOWDataPerUserCurrentDateTime(_userId)).FirstOrDefault()?.TemplateWorkout.Name ?? string.Empty;
+        _aw = logWorkOutService.GetCurrentWorkout(_userGuid);
+        if (_aw.Id > 0)
+        {
+            _starttime = _aw.WorkoutStartTime;            
+        }
+
+        _workoutText = dow?.TemplateWorkout.Name ?? string.Empty;
     }
     private async Task Start()
     {
-        _starttime = DateTime.Now.TimeOfDay;
+        _starttime = _starttime == TimeSpan.Zero ? DateTime.Now.TimeOfDay : _starttime;
         _strtresWorkOut = true;
         _pauseWorkOut = false;
         _resetWorkOut = false;
         _endWorkOut = false;
+        _displaygrid = true;
         stopwatch.Start();
         uiRefreshTimer.Start();
 
-        await logWorkOutService.SaveNewActualWorkOut(_userGuid, _dowId, DateTime.Now, "",true);
+        _woId = await logWorkOutService.SaveNewActualWorkOut(_userGuid, _dowId, new DateTime(DateOnly.FromDateTime(DateTime.Now),
+            new TimeOnly(_starttime.Value.Hours, _starttime.Value.Minutes, _starttime.Value.Seconds)), _notes);
 
     }
     private void Pause()
@@ -263,6 +278,7 @@
         _pauseWorkOut = true;
         _resetWorkOut = true;
         _endWorkOut = true;
+        _displaygrid = false;
         StateHasChanged(); // Force a re-render to catch the final static time
     }
     private async Task Reset()
@@ -291,7 +307,16 @@
             _endWorkOut = true;
             _starttime = TimeSpan.Zero;
             _endtime = TimeSpan.Zero;
+            _displaygrid = false;
+            await logWorkOutService.ResetActualWorkOut(_userGuid);
             StateHasChanged();
+            foreach (var item in _viewModel)
+            {
+                if (LoadGridDetailData != null)
+                {
+                    _detailCache[item] = await LoadGridDetailData(item);
+                }
+            }
         }
     }
     private async void OnTimerElapsed(object? sender, ElapsedEventArgs e)
@@ -343,7 +368,6 @@
     private async Task SetNewDropDetailDownValue(PropertyInfo prop, object? value, int index, TGridEntityDetails item)
     {
     }
-
     private void RemoveDetails(List<TGridEntityDetails> list, TGridEntityDetails remove)
     {
     }
@@ -370,9 +394,14 @@
             StateHasChanged();
         }
     }
-    public async Task OnSetCompleted(bool complete)
+    public async Task OnSetCompleted(TGridEntityDetails? detail)
     {
-        await SaveWorkOutData();
+
+        if (detail != null)
+        {
+            await CompleteSet(detail, _woId);
+        }
+
     }
 
 }
