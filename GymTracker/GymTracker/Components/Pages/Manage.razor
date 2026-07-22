@@ -67,7 +67,7 @@ else if (EntityName == "logworkout")
 {
     <LogWorkout TGridEntity="LogWorkoutLogExerciseVM"
                 TGridEntityDetails="LogWorkoutSetVM"
-                LoadGridData="@(x => logWorkOutService.GetExercises(x))"
+                LoadGridData="@((x,y) => logWorkOutService.GetExercises(x,y))"
                 LoadGridDetailData="@(x => logWorkOutService.GetExerciseData(x))"
                 CompleteSet="@((x,y) => logWorkOutService.CompleteSet(x,y))" />
 }

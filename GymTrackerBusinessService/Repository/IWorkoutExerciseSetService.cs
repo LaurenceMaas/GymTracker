@@ -357,28 +357,31 @@ namespace GymTrackerBusinessService.Repository
                     iter = 0;
                     foreach (WorkoutSetMetricVM wsm in workoutSetVM.WorkoutSetMetricVMs)
                     {
-                        tsmUpdate = tsmOrig.FindAll(x => (x.TemplateSetId == tSet.Id));
-                        //only allowing 2 metrics
-                        if (tsmUpdate.Count >= 2)
+                        if (wsm.MetricId > 0)
                         {
-                            tsmToSave = tsmOrig.FirstOrDefault(x => (x.TemplateSetId == tSet.Id) && x.MetricId == wsm.MetricId) ?? tsmUpdate.ElementAt(iter);
-                        }
-                        else
-                        {
-                            tsmToSave = new TemplateSetMetric();
-                        }
+                            tsmUpdate = tsmOrig.FindAll(x => (x.TemplateSetId == tSet.Id));
+                            //only allowing 2 metrics
+                            if (tsmUpdate.Count >= 2)
+                            {
+                                tsmToSave = tsmOrig.FirstOrDefault(x => (x.TemplateSetId == tSet.Id) && x.MetricId == wsm.MetricId) ?? tsmUpdate.ElementAt(iter);
+                            }
+                            else
+                            {
+                                tsmToSave = new TemplateSetMetric();
+                            }
 
-                        tsmToSave.NumericValue = wsm.NumericValue;
-                        tsmToSave.TextValue = wsm.TextValue;
-                        tsmToSave.TemplateSetId = tSet.Id;//workoutSetVM.TemplateSetId;
-                        tsmToSave.MetricId = wsm.MetricId;
-                        if (tsmToSave.Id != 0)
-                        {
-                            await tsmRepoService.UpdateAsync(tsmToSave);
-                        }
-                        else
-                        {
-                            await tsmRepoService.InsertAsync(tsmToSave);
+                            tsmToSave.NumericValue = wsm.NumericValue;
+                            tsmToSave.TextValue = wsm.TextValue;
+                            tsmToSave.TemplateSetId = tSet.Id;//workoutSetVM.TemplateSetId;
+                            tsmToSave.MetricId = wsm.MetricId;
+                            if (tsmToSave.Id != 0)
+                            {
+                                await tsmRepoService.UpdateAsync(tsmToSave);
+                            }
+                            else
+                            {
+                                await tsmRepoService.InsertAsync(tsmToSave);
+                            }
                         }
                         iter++;
                     }

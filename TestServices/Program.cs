@@ -26,6 +26,7 @@ var db = new EntityDBContext(_optionsBuilder.Options);
 //}
 //await test.SaveExerciseSetsData(data);
 ILogWorkOutService test = new LogWorkOutService(db);
-var result = await test.GetExercises(1);
-var sets = await test.GetExerciseData(result.ElementAt(0));
+Guid user = new Guid("05271C1E-ECC5-4B9D-A2FA-5B0B4DFE9F39");
+var result = await test.GetExercises(1, user);
+var sets = await test.GetExerciseData(result.ElementAt(2));
 Console.WriteLine($"{result}");

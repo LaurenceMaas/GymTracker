@@ -19,7 +19,7 @@ namespace GymTrackerBusinessService.Repository
     public interface ILogWorkOutService
     {
         Task<List<DOWWorkout>> LoadDOWDataPerUserCurrentDateTime(string UserId);
-        Task<List<LogWorkoutLogExerciseVM>> GetExercises(int workOutTemplateId);
+        Task<List<LogWorkoutLogExerciseVM>> GetExercises(int workOutTemplateId, Guid user);
         Task<List<LogWorkoutSetVM>> GetExerciseData(LogWorkoutLogExerciseVM workoutLogExerciseVM);
         Task<int> SaveNewActualWorkOut(Guid user,int DOWWorkoutId,DateTime startDateTime,string? notes);
         Task ResetActualWorkOut(Guid user);
@@ -33,6 +33,8 @@ namespace GymTrackerBusinessService.Repository
     }
     public class LogWorkoutLogExerciseVM
     {
+        [IgnoreInGrid]
+        public int ActualExerciseId { get; set; }
         [IgnoreInGrid]
         public int TemplateExerciseId { get; set; }
         [ReadOnly(true)]
@@ -132,46 +134,62 @@ namespace GymTrackerBusinessService.Repository
             _astable = _context.Set<ActualSet>();
             _amtable = _context.Set<ActualSetMetric>();
         }
-        public async Task<List<LogWorkoutLogExerciseVM>> GetExercises(int workOutTemplateId)
+        public async Task<List<LogWorkoutLogExerciseVM>> GetExercises(int workOutTemplateId, Guid user)
         {
-            int i = 0;
-            var logExerciseVM = (
+            ActualWorkout aw;
+            aw = GetCurrentWorkout(user);
+            if (aw.WorkOutStatusId == (int)workoutStatus.Ended)
+            {
+                return new List<LogWorkoutLogExerciseVM>();
+            }
+
+            var logExerciseVM =
+            (
             await
             (
-            from templateWorkout in _wtTable
-            join templateExercise in _tetable on templateWorkout.Id equals templateExercise.WorkoutTemplateId
+            from templateExercise in _tetable
             join exercise in _etable on templateExercise.ExerciseId equals exercise.Id
-            where templateWorkout.Id == workOutTemplateId
+            join actualExerciseGroup in _aetable.Where(x => x.ActualWorkoutId == aw.Id) on templateExercise.Id equals actualExerciseGroup.TemplateExerciseId
+            into actualExerciseJoin
+            from actualExercise in actualExerciseJoin.DefaultIfEmpty()
+            where templateExercise.WorkoutTemplateId == workOutTemplateId
             select new
             {
                 TemplateExerciseId = templateExercise.Id,
                 ExerciseName = exercise.Name,
+                ActualExerciseId = actualExercise == null
+            ? 0
+            : actualExercise.Id
             }
             )
-            .ToListAsync())
+            .ToListAsync()
+            )
             .Select((x, index) => new
             {
                 RowNumber = index + 1,
                 x.ExerciseName,
-                x.TemplateExerciseId
+                x.TemplateExerciseId,
+                x.ActualExerciseId
             })
-            .ToList();
+            .ToList();        
 
             List<LogWorkoutLogExerciseVM> result = logExerciseVM
             .GroupBy(x => new
             {
                 x.ExerciseName,
                 x.RowNumber,
-                x.TemplateExerciseId
+                x.TemplateExerciseId,
+                x.ActualExerciseId
             })
             .Select(g => new LogWorkoutLogExerciseVM
             {
                 ExerciseNumber = g.Key.RowNumber,
                 ExerciseName = g.Key.ExerciseName,
-                TemplateExerciseId = g.Key.TemplateExerciseId
-
+                TemplateExerciseId = g.Key.TemplateExerciseId,
+                ActualExerciseId = g.Key.ActualExerciseId
             }
             ).ToList();
+
 
             return result ?? new List<LogWorkoutLogExerciseVM>();
         }
@@ -264,7 +282,8 @@ namespace GymTrackerBusinessService.Repository
                 }
 
                 var readComplete = (await (from actualSet in _astable
-                                           where actualSet.TemplateSetId == logWorkoutSetVM.TemplateSetId
+                                           where (actualSet.ActualExerciseId == workoutLogExerciseVM.ActualExerciseId
+                                           && actualSet.TemplateSetId == logWorkoutSetVM.TemplateSetId)
                                            select new
                                            {
                                                Completed = actualSet.Completed
@@ -346,7 +365,6 @@ namespace GymTrackerBusinessService.Repository
             join dowworkout in _dwtable on actualWorkout.DOWWorkoutId equals dowworkout.Id
             where actualWorkout.PerformedByUserId == user
             && DateOnly.FromDateTime(actualWorkout.WorkoutStartDate) == DateOnly.FromDateTime(DateTime.Now)
-            && actualWorkout.WorkOutStatusId == (int)workoutStatus.Started
             && dowworkout.WorkoutPeriodId == workoutPeriod
             select new ActualWorkout
             {
@@ -496,6 +514,8 @@ namespace GymTrackerBusinessService.Repository
             IGenericRepoService<ActualWorkout> genericRepoService = new GenericRepoService<ActualWorkout>(new EntityDBContext(_optionsBuilder.Options));
             ActualWorkout aw = await genericRepoService.GetByIdAsync(actualWOId);
             aw.WorkOutStatusId = (int)workoutStatus.Ended;
+            aw.WorkoutEndDate = DateTime.Now;
+            aw.WorkoutEndTime = DateTime.Now.TimeOfDay;
             await genericRepoService.UpdateAsync(aw);
         }
     }

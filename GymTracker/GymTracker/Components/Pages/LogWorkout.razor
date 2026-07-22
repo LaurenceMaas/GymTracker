@@ -173,7 +173,7 @@
     [Parameter]
     public Func<TGridEntity, Task<List<TGridEntityDetails>>>? LoadGridDetailData { get; set; }
     [Parameter]
-    public Func<int, Task<List<TGridEntity>>>? LoadGridData { get; set; }
+    public Func<int, Guid,Task<List<TGridEntity>>>? LoadGridData { get; set; }
     [Parameter]
     public Func<TGridEntityDetails, int, Task>? CompleteSet { get; set; }
 
@@ -235,7 +235,7 @@
             {
                 _idValue = dow?.TemplateWorkoutId;
                 _dowId = dow.Id;
-                _viewModel = await LoadGridData((int)_idValue);
+                _viewModel = await LoadGridData((int)_idValue,_userGuid);
             }
         }
         foreach (var item in _viewModel)
@@ -252,7 +252,7 @@
             _starttime = _aw.WorkoutStartTime;            
         }
 
-        _workoutText = dow?.TemplateWorkout.Name ?? string.Empty;
+        _workoutText = ((dow?.TemplateWorkout.Name == null) || (_viewModel.Count ==0)) ? "No workouts for this period":dow.TemplateWorkout.Name;
     }
     private async Task Start()
     {
@@ -391,7 +391,17 @@
             stopwatch.Reset();
             uiRefreshTimer.Stop();
             _endtime = DateTime.Now.TimeOfDay;
+            _strtresWorkOut = true;
+            _pauseWorkOut = true;
+            _resetWorkOut = true;
+            _endWorkOut = true;
+            _aw = logWorkOutService.GetCurrentWorkout(_userGuid);
+            await logWorkOutService.CompleteWorkout(_aw.Id);
+            _viewModel = new List<TGridEntity>();
+            _detailCache = new Dictionary<object, List<TGridEntityDetails>>(0);
+            _workoutText = "No workouts for this period";
             StateHasChanged();
+            
         }
     }
     public async Task OnSetCompleted(TGridEntityDetails? detail)
