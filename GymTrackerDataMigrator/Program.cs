@@ -102,128 +102,15 @@ void CreateSeedData(EntityDBContext context)
         new Metric { Name = "Distance", Unit = "km", ValueType = MetricValueType.Numeric },
         new Metric { Name = "Tempo", Unit = null, ValueType = MetricValueType.Text },
         new Metric { Name = "Notes", Unit = null, ValueType = MetricValueType.Text },
-        new Metric { Name = "Heart Rate", Unit = "bpm", ValueType = MetricValueType.Numeric });
+        new Metric { Name = "Heart Rate", Unit = "bpm", ValueType = MetricValueType.Numeric },
+        new Metric { Name = "Percent 1RM", Unit = "%", ValueType = MetricValueType.Numeric },
+        new Metric { Name = "Percent HRmax", Unit = "%", ValueType = MetricValueType.Numeric });
         context.SaveChanges();
     }
-    if (!context.LKP_WorkoutTemplate.Any())
-    {
-        var now = DateTime.Now;
-        var workouts = context.LKP_WorkoutTemplate;
-        workouts.AddRange(
-
-        new TemplateWorkout
-        {
-            Name = "Beginner Full Body",
-            Notes = "Full body workout 3x per week",
-        },
-
-        new TemplateWorkout
-        {
-            Name = "Push Workout",
-            Notes = "Chest, shoulders, triceps",
-        },
-
-        new TemplateWorkout
-        {
-            Name = "Pull Workout",
-            Notes = "Back and biceps",
-
-        },
-
-        new TemplateWorkout
-        {
-            Name = "Leg Workout",
-            Notes = "Lower body strength",
-        }
-        );
-
-        context.SaveChanges();
-
-    }
-    int Bench = context.LKP_Exercise.First(x => x.Name == "Barbell Bench Press").Id;
-    int Squat = context.LKP_Exercise.First(x => x.Name == "Barbell Squat").Id;
-    int Deadlift = context.LKP_Exercise.First(x => x.Name == "Deadlift").Id;
-    int OHP = context.LKP_Exercise.First(x => x.Name == "Dumbbell Shoulder Press").Id;
-    int Row = context.LKP_Exercise.First(x => x.Name == "Bent Over Row").Id;
-    int Curl = context.LKP_Exercise.First(x => x.Name == "Barbell Curl").Id;
-    int Tricep = context.LKP_Exercise.First(x => x.Name == "Tricep Pushdown").Id;
-    int Lat = context.LKP_Exercise.First(x => x.Name == "Lat Pulldown").Id;
-    int LegPress = context.LKP_Exercise.First(x => x.Name == "Leg Press").Id;
-
-    if (!context.LKP_TemplateExercise.Any())
-    {
-        var now = DateTime.Now;
-        var user = "laurencemaasdorp@gmail.com";
-
-        var fullBody = context.LKP_WorkoutTemplate.First(x => x.Name == "Beginner Full Body").Id;
-        var push = context.LKP_WorkoutTemplate.First(x => x.Name == "Push Workout").Id;
-        var pull = context.LKP_WorkoutTemplate.First(x => x.Name == "Pull Workout").Id;
-        var legs = context.LKP_WorkoutTemplate.First(x => x.Name == "Leg Workout").Id;
-
-        context.LKP_TemplateExercise.AddRange(
-
-        // FULL BODY (Starting Strength style)
-
-        new TemplateExercise { WorkoutTemplateId = fullBody, ExerciseId = Squat },
-        new TemplateExercise { WorkoutTemplateId = fullBody, ExerciseId = Bench },
-        new TemplateExercise { WorkoutTemplateId = fullBody, ExerciseId = Row },
-        new TemplateExercise { WorkoutTemplateId = fullBody, ExerciseId = Deadlift }
-
-        //// PUSH
-
-        //new TemplateExercise { WorkoutTemplateId = push, ExerciseId = Bench },
-        //new TemplateExercise { WorkoutTemplateId = push, ExerciseId = OHP },
-        //new TemplateExercise { WorkoutTemplateId = push, ExerciseId = Tricep },
-
-        //// PULL
-
-        //new TemplateExercise { WorkoutTemplateId = pull, ExerciseId = Row },
-        //new TemplateExercise { WorkoutTemplateId = pull, ExerciseId = Lat },
-        //new TemplateExercise { WorkoutTemplateId = pull, ExerciseId = Curl },
-
-        //// LEGS
-
-        //new TemplateExercise { WorkoutTemplateId = legs, ExerciseId = Squat },
-        //new TemplateExercise { WorkoutTemplateId = legs, ExerciseId = LegPress },
-        //new TemplateExercise { WorkoutTemplateId = legs, ExerciseId = Deadlift }
-
-        );
-        context.SaveChanges();
-
-    }
-    if (!context.LKP_TemplateSet.Any())
-    {
-
-        var workoutIds = context.LKP_WorkoutTemplate.ToList().Select(x => x.Id);
-        var exerciseTemplate = context.LKP_TemplateExercise.ToList();
-        int i;
-        List<TemplateSet> test = new List<TemplateSet>();
-
-        foreach (var workoutTemp in workoutIds)
-        {
-                      
-
-            foreach (var ex in exerciseTemplate.FindAll(x => x.WorkoutTemplateId == workoutTemp))
-            {
-                i = 1;
-                for (int setNo = 1; setNo <= 4; setNo++)
-                {
-                    context.LKP_TemplateSet.Add(
-                        new TemplateSet
-                        {
-                            TemplateExerciseId = ex.Id,
-                            Order = i
-                        });
-
-                    i++;
-                }
-
-                context.SaveChanges();
-            }
-
-        }
-
-    }
+    EnsureMetric(context, "Percent 1RM", "%");
+    EnsureMetric(context, "Percent HRmax", "%");
+    RebuildSeededWorkouts(context);
+    SeedTemplateTrainingGoals(context);
     if (!context.LKP_ExerciseMetric.Any())
     {
         int reps = context.LKP_Metric.First(x => x.Name == "Reps").Id;
@@ -295,66 +182,13 @@ void CreateSeedData(EntityDBContext context)
         context.SaveChanges();
     }
 
-    if (!context.LKP_TemplateSetMetric.Any())
-    {
-        int repsMetric = context.LKP_Metric.First(x => x.Name == "Reps").Id;
-        int weightMetric = context.LKP_Metric.First(x => x.Name == "Percentage Body Weight").Id;
-
-        var templateSets = context.LKP_TemplateSet
-            .Include(x => x.TemplateExercise)
-            .ThenInclude(x => x.Exercise)
-            .OrderBy(x => x.TemplateExerciseId)
-            .ThenBy(x => x.Order)
-            .ToList();
-
-        foreach (var set in templateSets)
-        {
-            int reps = set.Order switch
-            {
-                1 => 12,
-                2 => 10,
-                3 => 8,
-                4 => 6,
-                _ => 10
-            };
-
-            decimal weight = set.Order switch
-            {
-                1 => 40,
-                2 => 50,
-                3 => 60,
-                4 => 70,
-                _ => 40
-            };
-
-            context.LKP_TemplateSetMetric.AddRange(
-
-                new TemplateSetMetric
-                {
-                    TemplateSetId = set.Id,
-                    MetricId = repsMetric,
-                    NumericValue = reps
-                },
-
-                new TemplateSetMetric
-                {
-                    TemplateSetId = set.Id,
-                    MetricId = weightMetric,
-                    NumericValue = weight
-                }
-            );
-        }
-
-        context.SaveChanges();
-    }
-
     if (!context.LKP_WorkoutPeriod.Any(d => d.Id == 1))
     {
         DbSet<WorkoutPeriod> workoutPeriod = context.LKP_WorkoutPeriod;
         workoutPeriod.AddRange(
         new WorkoutPeriod { Description = "Morning",StartTime = new TimeSpan(5,0,0), EndTime = new TimeSpan(12,0,0) },
         new WorkoutPeriod { Description = "Afternoon" ,StartTime = new TimeSpan(12, 1,0), EndTime = new TimeSpan(18, 0,0) },
-        new WorkoutPeriod { Description = "Evening", StartTime = new TimeSpan(18, 1,0), EndTime = new TimeSpan(4, 59, 0) }
+        new WorkoutPeriod { Description = "Evening", StartTime = new TimeSpan(18, 1,0), EndTime = new TimeSpan(23, 59, 0) }
         );
         context.SaveChanges();
     }
@@ -370,6 +204,440 @@ void CreateSeedData(EntityDBContext context)
         context.SaveChanges();
     }
 
+    SeedNoviceSchedule(context);
+}
+
+void EnsureMetric(EntityDBContext context, string name, string unit)
+{
+    if (context.LKP_Metric.Any(x => x.Name == name))
+    {
+        return;
+    }
+
+    context.LKP_Metric.Add(new Metric
+    {
+        Name = name,
+        Unit = unit,
+        ValueType = MetricValueType.Numeric
+    });
+    context.SaveChanges();
+}
+
+void RebuildSeededWorkouts(EntityDBContext context)
+{
+    const string fullBodyReference = "https://pubmed.ncbi.nlm.nih.gov/21694556/";
+    const string splitReference = "https://pubmed.ncbi.nlm.nih.gov/19204579/";
+    const string hiitReference = "https://pubmed.ncbi.nlm.nih.gov/17414804/";
+    const string cardioReference = "https://www.who.int/publications/i/item/9789240015128";
+    const string hypertrophyReference = "https://pubmed.ncbi.nlm.nih.gov/27433992/";
+
+    var workouts = new (string Name, string Notes, string Reference, string Level)[]
+    {
+        ("Beginner Full Body", "Full-body strength on Monday, Wednesday, and Friday. Two sets. Use a load near 65% of 1RM and leave about 1-3 reps in reserve. Rest 2-3 minutes between compound sets. Plank is a 20-second hold.", fullBodyReference, "Novice"),
+        ("Push Workout", "Chest, shoulders, and triceps. Perform twice a week. Compounds are 3 sets of 8 at about 75% of 1RM. Isolation work is 3 sets of 12 at about 65% of 1RM. Rest 2-3 minutes on compounds and 1-2 minutes on isolation.", splitReference, "Intermediate"),
+        ("Pull Workout", "Back and biceps. Perform twice a week. Compounds are 3 sets of 8-10. Isolation work is 3 sets of 12 at about 65% of 1RM. Rest 2-3 minutes on compounds and 1-2 minutes on isolation.", splitReference, "Intermediate"),
+        ("Leg Workout", "Lower body. Perform twice a week. Squats are 3 sets of 8 at about 75% of 1RM. Lunges are 8 reps per leg. Rest 2-3 minutes on squats and 1-2 minutes on isolation.", splitReference, "Intermediate"),
+        ("HIIT 4x4", "Running. Odd sets are 4-minute hard efforts and even sets are 3-minute easy recoveries. Up to 3 days a week, separate from strength training. The 16 hard minutes count as vigorous aerobic time. Hard efforts are prescribed at 90-95% HRmax; the stored target is 90. Recovery is 70% HRmax.", hiitReference, "Advanced"),
+        ("Moderate Cardio", "Moderate cycling for 50 minutes. Keep a pace where talking is possible and singing is not. Tuesday, Thursday, and Saturday.", cardioReference, "Novice"),
+        ("Advanced Push", "Chest, shoulders, and triceps for trained lifters. Repeat up to twice a week. Once is about 7 hard chest sets; twice is a high-volume week. Rest 2-3 minutes on presses and 1-2 minutes on isolation. Leave about 1-2 reps in reserve.", hypertrophyReference, "Advanced"),
+        ("Advanced Pull", "Back and biceps for trained lifters. Repeat up to twice a week. Rest 2-3 minutes on rows and pulldowns and 1-2 minutes on isolation. Leave about 1-2 reps in reserve.", hypertrophyReference, "Advanced"),
+        ("Advanced Legs", "Lower body for trained lifters. Repeat up to twice a week. Twice is a high-volume week, so do not also run Strength Squat or Strength Deadlift that week. Lunges are 8 reps per leg. Rest 2-3 minutes on squats.", hypertrophyReference, "Advanced"),
+        ("Strength Upper", "Heavy upper body. Perform twice a week for about 8 sets per lift at 85% of 1RM. Rest 3-5 minutes. Leave about 1-2 reps in reserve. Loads are not all-out repetition maximums.", splitReference, "Advanced"),
+        ("Strength Squat", "Heavy squat day. Rest 3-5 minutes on the squats. Leave about 1-2 reps in reserve. Pair with Strength Deadlift on another day rather than Advanced Legs in the same week.", splitReference, "Advanced"),
+        ("Strength Deadlift", "Heavy deadlift day. Triples at 85% of 1RM leave reps in reserve and are not all-out 3-rep maxes. Lunges are 6 reps per leg. Rest 3-5 minutes on deadlifts.", splitReference, "Advanced"),
+        ("Heavy Full Body", "Heavy day of a three-day full-body week. Squat, bench, and row at 85% of 1RM. Rest 3-5 minutes. Leave about 1-2 reps in reserve.", splitReference, "Advanced"),
+        ("Hypertrophy Full Body", "Moderate day of a three-day full-body week. Compounds are 3 sets of 8 at 75% of 1RM. Rest 2-3 minutes on compounds.", splitReference, "Intermediate"),
+        ("Power Full Body", "Fast day of a three-day full-body week. Use 3 reps at 40-50% of 1RM and accelerate each lift. Lower the bar under control. Rest about 3 minutes. These are normal squats and presses, not Olympic lifts.", splitReference, "Advanced"),
+        ("Muscular Endurance", "Local muscular endurance. 15 reps at 40-50% of 1RM with rest under 90 seconds. Lunges are 15 reps per leg. Crunches are bodyweight.", splitReference, "Novice"),
+        ("Vigorous Run", "Continuous running for 25 minutes at 80% HRmax, inside the vigorous band of 77-95%. Three sessions equal 75 minutes of vigorous aerobic time.", fullBodyReference, "Intermediate"),
+        ("Easy Run", "Easy running for 45 minutes at 65% HRmax. Keep a pace where talking is comfortable. Counts as moderate aerobic time.", cardioReference, "Novice"),
+        ("Steady Row", "Steady rowing for 40 minutes at 70% HRmax, in the middle of the moderate band of 64-76%.", fullBodyReference, "Intermediate"),
+        ("HIIT 4x4 Cycling", "Cycling. Same 4-minute hard and 3-minute easy pattern as HIIT 4x4. Hard efforts are stored at 90% HRmax, the bottom of the 90-95% zone. Recovery is 70% HRmax. The original study used running.", hiitReference, "Advanced"),
+        ("HIIT 4x4 Rowing", "Rowing. Same 4-minute hard and 3-minute easy pattern as HIIT 4x4. Hard efforts are stored at 90% HRmax, the bottom of the 90-95% zone. Recovery is 70% HRmax. The original study used running.", hiitReference, "Advanced")
+    };
+
+    foreach (var item in workouts)
+    {
+        var workout = context.LKP_WorkoutTemplate.FirstOrDefault(x => x.Name == item.Name);
+        if (workout == null)
+        {
+            workout = new TemplateWorkout { Name = item.Name };
+            context.LKP_WorkoutTemplate.Add(workout);
+        }
+
+        workout.Notes = item.Notes;
+        workout.Reference = item.Reference;
+        workout.FitnessLevelId = context.LKP_FitnessLevel.First(x => x.Description == item.Level).Id;
+    }
+    context.SaveChanges();
+
+    var seededNames = workouts.Select(x => x.Name).ToArray();
+    var templateExerciseIds = context.LKP_TemplateExercise
+        .AsNoTracking()
+        .Where(x => seededNames.Contains(x.WorkoutTemplate.Name))
+        .Select(x => x.Id)
+        .ToList();
+
+    if (templateExerciseIds.Count > 0)
+    {
+        context.LKP_TemplateSetMetric.Where(x => templateExerciseIds.Contains(x.TemplateSet.TemplateExerciseId)).ExecuteDelete();
+        context.LKP_TemplateSet.Where(x => templateExerciseIds.Contains(x.TemplateExerciseId)).ExecuteDelete();
+        context.LKP_TemplateExercise.Where(x => templateExerciseIds.Contains(x.Id)).ExecuteDelete();
+    }
+
+    int repsMetric = context.LKP_Metric.First(x => x.Name == "Reps").Id;
+    int percent1Rm = context.LKP_Metric.First(x => x.Name == "Percent 1RM").Id;
+    int durationMetric = context.LKP_Metric.First(x => x.Name == "Duration").Id;
+    int percentHrMax = context.LKP_Metric.First(x => x.Name == "Percent HRmax").Id;
+
+    AddResistanceWorkout(context, "Beginner Full Body", repsMetric, percent1Rm,
+        ("Barbell Squat", 2, 10, 65m),
+        ("Barbell Bench Press", 2, 10, 65m),
+        ("Lat Pulldown", 2, 10, 65m),
+        ("Dumbbell Shoulder Press", 2, 10, 65m),
+        ("Bent Over Row", 2, 10, 65m),
+        ("Deadlift", 2, 8, 65m));
+    AddTimedExercise(context, "Beginner Full Body", "Plank", 2, 20, durationMetric);
+
+    AddResistanceWorkout(context, "Push Workout", repsMetric, percent1Rm,
+        ("Barbell Bench Press", 3, 8, 75m),
+        ("Incline Bench Press", 3, 8, 75m),
+        ("Dumbbell Shoulder Press", 3, 8, 75m),
+        ("Lateral Raise", 3, 12, 65m),
+        ("Tricep Pushdown", 3, 12, 65m));
+
+    AddResistanceWorkout(context, "Pull Workout", repsMetric, percent1Rm,
+        ("Bent Over Row", 3, 8, 75m),
+        ("Lat Pulldown", 3, 8, 75m),
+        ("Seated Row", 3, 10, 70m),
+        ("Rear Delt Fly", 3, 12, 65m),
+        ("Barbell Curl", 3, 12, 65m));
+
+    AddResistanceWorkout(context, "Leg Workout", repsMetric, percent1Rm,
+        ("Barbell Squat", 3, 8, 75m),
+        ("Leg Press", 2, 10, 70m),
+        ("Lunges", 2, 8, 65m),
+        ("Leg Curl", 3, 12, 65m),
+        ("Calf Raise", 3, 12, 65m));
+
+    AddHiit(context, "HIIT 4x4", "Running", durationMetric, percentHrMax);
+    AddTimedExercise(context, "Moderate Cardio", "Cycling", 1, 3000, durationMetric);
+
+    AddResistanceWorkout(context, "Advanced Push", repsMetric, percent1Rm,
+        ("Barbell Bench Press", 4, 8, 75m),
+        ("Incline Bench Press", 3, 10, 70m),
+        ("Dumbbell Shoulder Press", 3, 8, 75m),
+        ("Lateral Raise", 3, 12, 65m),
+        ("Tricep Pushdown", 3, 12, 65m),
+        ("Skull Crusher", 2, 10, 70m));
+
+    AddResistanceWorkout(context, "Advanced Pull", repsMetric, percent1Rm,
+        ("Bent Over Row", 4, 8, 75m),
+        ("Lat Pulldown", 3, 8, 75m),
+        ("Rear Delt Fly", 3, 12, 65m),
+        ("Barbell Curl", 3, 10, 70m),
+        ("Hammer Curl", 3, 12, 65m));
+
+    AddResistanceWorkout(context, "Advanced Legs", repsMetric, percent1Rm,
+        ("Barbell Squat", 4, 6, 80m),
+        ("Leg Press", 3, 10, 70m),
+        ("Lunges", 3, 8, 70m),
+        ("Leg Curl", 3, 12, 65m),
+        ("Calf Raise", 4, 12, 65m));
+
+    AddResistanceWorkout(context, "Strength Upper", repsMetric, percent1Rm,
+        ("Barbell Bench Press", 4, 5, 85m),
+        ("Bent Over Row", 4, 5, 85m),
+        ("Shoulder Press", 4, 5, 85m),
+        ("Lat Pulldown", 4, 5, 85m));
+
+    AddResistanceWorkout(context, "Strength Squat", repsMetric, percent1Rm,
+        ("Barbell Squat", 4, 5, 85m),
+        ("Front Squat", 3, 5, 80m),
+        ("Leg Curl", 3, 8, 70m),
+        ("Calf Raise", 3, 8, 75m));
+
+    AddResistanceWorkout(context, "Strength Deadlift", repsMetric, percent1Rm,
+        ("Deadlift", 4, 3, 85m),
+        ("Leg Press", 3, 6, 80m),
+        ("Lunges", 3, 6, 75m),
+        ("Leg Curl", 3, 8, 70m));
+
+    AddResistanceWorkout(context, "Heavy Full Body", repsMetric, percent1Rm,
+        ("Barbell Squat", 4, 5, 85m),
+        ("Barbell Bench Press", 4, 5, 85m),
+        ("Bent Over Row", 4, 5, 85m));
+
+    AddResistanceWorkout(context, "Hypertrophy Full Body", repsMetric, percent1Rm,
+        ("Barbell Squat", 3, 8, 75m),
+        ("Barbell Bench Press", 3, 8, 75m),
+        ("Lat Pulldown", 3, 8, 75m),
+        ("Dumbbell Shoulder Press", 3, 10, 70m),
+        ("Leg Curl", 3, 10, 70m));
+
+    AddResistanceWorkout(context, "Power Full Body", repsMetric, percent1Rm,
+        ("Barbell Squat", 5, 3, 50m),
+        ("Barbell Bench Press", 5, 3, 40m),
+        ("Shoulder Press", 5, 3, 40m));
+
+    AddResistanceWorkout(context, "Muscular Endurance", repsMetric, percent1Rm,
+        ("Barbell Squat", 3, 15, 50m),
+        ("Dumbbell Press", 3, 15, 50m),
+        ("Seated Row", 3, 15, 50m),
+        ("Lunges", 2, 15, 50m),
+        ("Lateral Raise", 2, 15, 40m),
+        ("Calf Raise", 2, 15, 50m));
+    AddRepsOnlyExercise(context, "Muscular Endurance", "Crunch", 3, 15, repsMetric);
+
+    AddSteadyCardio(context, "Vigorous Run", "Running", 1500, 80m, durationMetric, percentHrMax);
+    AddSteadyCardio(context, "Easy Run", "Running", 2700, 65m, durationMetric, percentHrMax);
+    AddSteadyCardio(context, "Steady Row", "Rowing Machine", 2400, 70m, durationMetric, percentHrMax);
+    AddHiit(context, "HIIT 4x4 Cycling", "Cycling", durationMetric, percentHrMax);
+    AddHiit(context, "HIIT 4x4 Rowing", "Rowing Machine", durationMetric, percentHrMax);
+}
+
+void AddResistanceWorkout(EntityDBContext context, string workoutName, int repsMetricId, int percentMetricId, params (string Exercise, int Sets, int Reps, decimal Percent1Rm)[] exercises)
+{
+    int workoutId = context.LKP_WorkoutTemplate.First(x => x.Name == workoutName).Id;
+    var templateExercises = exercises.Select(item => new TemplateExercise
+    {
+        WorkoutTemplateId = workoutId,
+        ExerciseId = context.LKP_Exercise.First(x => x.Name == item.Exercise).Id
+    }).ToList();
+    context.LKP_TemplateExercise.AddRange(templateExercises);
+    context.SaveChanges();
+
+    var sets = new List<(TemplateSet Set, int Reps, decimal Percent1Rm)>();
+    for (int index = 0; index < exercises.Length; index++)
+    {
+        for (int order = 1; order <= exercises[index].Sets; order++)
+        {
+            var set = new TemplateSet
+            {
+                TemplateExerciseId = templateExercises[index].Id,
+                Order = order
+            };
+            context.LKP_TemplateSet.Add(set);
+            sets.Add((set, exercises[index].Reps, exercises[index].Percent1Rm));
+        }
+    }
+    context.SaveChanges();
+
+    context.LKP_TemplateSetMetric.AddRange(sets.SelectMany(item => new[]
+    {
+        new TemplateSetMetric { TemplateSetId = item.Set.Id, MetricId = repsMetricId, NumericValue = item.Reps },
+        new TemplateSetMetric { TemplateSetId = item.Set.Id, MetricId = percentMetricId, NumericValue = item.Percent1Rm }
+    }));
+    context.SaveChanges();
+}
+
+void AddTimedExercise(EntityDBContext context, string workoutName, string exerciseName, int sets, int durationSeconds, int durationMetricId)
+{
+    int workoutId = context.LKP_WorkoutTemplate.First(x => x.Name == workoutName).Id;
+    var templateExercise = new TemplateExercise
+    {
+        WorkoutTemplateId = workoutId,
+        ExerciseId = context.LKP_Exercise.First(x => x.Name == exerciseName).Id
+    };
+    context.LKP_TemplateExercise.Add(templateExercise);
+    context.SaveChanges();
+
+    for (int order = 1; order <= sets; order++)
+    {
+        var set = new TemplateSet { TemplateExerciseId = templateExercise.Id, Order = order };
+        context.LKP_TemplateSet.Add(set);
+        context.SaveChanges();
+        context.LKP_TemplateSetMetric.Add(new TemplateSetMetric
+        {
+            TemplateSetId = set.Id,
+            MetricId = durationMetricId,
+            NumericValue = durationSeconds
+        });
+    }
+    context.SaveChanges();
+}
+
+void AddRepsOnlyExercise(EntityDBContext context, string workoutName, string exerciseName, int sets, int reps, int repsMetricId)
+{
+    int workoutId = context.LKP_WorkoutTemplate.First(x => x.Name == workoutName).Id;
+    var templateExercise = new TemplateExercise
+    {
+        WorkoutTemplateId = workoutId,
+        ExerciseId = context.LKP_Exercise.First(x => x.Name == exerciseName).Id
+    };
+    context.LKP_TemplateExercise.Add(templateExercise);
+    context.SaveChanges();
+
+    for (int order = 1; order <= sets; order++)
+    {
+        var set = new TemplateSet { TemplateExerciseId = templateExercise.Id, Order = order };
+        context.LKP_TemplateSet.Add(set);
+        context.SaveChanges();
+        context.LKP_TemplateSetMetric.Add(new TemplateSetMetric
+        {
+            TemplateSetId = set.Id,
+            MetricId = repsMetricId,
+            NumericValue = reps
+        });
+    }
+    context.SaveChanges();
+}
+
+void AddSteadyCardio(EntityDBContext context, string workoutName, string exerciseName, int durationSeconds, decimal percentHrMax, int durationMetricId, int percentHrMaxMetricId)
+{
+    int workoutId = context.LKP_WorkoutTemplate.First(x => x.Name == workoutName).Id;
+    var templateExercise = new TemplateExercise
+    {
+        WorkoutTemplateId = workoutId,
+        ExerciseId = context.LKP_Exercise.First(x => x.Name == exerciseName).Id
+    };
+    context.LKP_TemplateExercise.Add(templateExercise);
+    context.SaveChanges();
+
+    var set = new TemplateSet { TemplateExerciseId = templateExercise.Id, Order = 1 };
+    context.LKP_TemplateSet.Add(set);
+    context.SaveChanges();
+    context.LKP_TemplateSetMetric.AddRange(
+        new TemplateSetMetric { TemplateSetId = set.Id, MetricId = durationMetricId, NumericValue = durationSeconds },
+        new TemplateSetMetric { TemplateSetId = set.Id, MetricId = percentHrMaxMetricId, NumericValue = percentHrMax });
+    context.SaveChanges();
+}
+
+void AddHiit(EntityDBContext context, string workoutName, string exerciseName, int durationMetricId, int percentHrMaxMetricId)
+{
+    int workoutId = context.LKP_WorkoutTemplate.First(x => x.Name == workoutName).Id;
+    var templateExercise = new TemplateExercise
+    {
+        WorkoutTemplateId = workoutId,
+        ExerciseId = context.LKP_Exercise.First(x => x.Name == exerciseName).Id
+    };
+    context.LKP_TemplateExercise.Add(templateExercise);
+    context.SaveChanges();
+
+    (int Duration, decimal PercentHrMax)[] intervals =
+    {
+        (240, 90m),
+        (180, 70m),
+        (240, 90m),
+        (180, 70m),
+        (240, 90m),
+        (180, 70m),
+        (240, 90m)
+    };
+
+    for (int index = 0; index < intervals.Length; index++)
+    {
+        var set = new TemplateSet { TemplateExerciseId = templateExercise.Id, Order = index + 1 };
+        context.LKP_TemplateSet.Add(set);
+        context.SaveChanges();
+        context.LKP_TemplateSetMetric.AddRange(
+            new TemplateSetMetric { TemplateSetId = set.Id, MetricId = durationMetricId, NumericValue = intervals[index].Duration },
+            new TemplateSetMetric { TemplateSetId = set.Id, MetricId = percentHrMaxMetricId, NumericValue = intervals[index].PercentHrMax });
+    }
+    context.SaveChanges();
+}
+
+void SeedTemplateTrainingGoals(EntityDBContext context)
+{
+    (string Goal, string Template)[] links =
+    {
+        ("Fat loss", "Moderate Cardio"),
+        ("Fat loss", "Easy Run"),
+        ("Fat loss", "Muscular Endurance"),
+        ("Fat loss", "Vigorous Run"),
+        ("Fat loss", "Steady Row"),
+        ("Fat loss", "HIIT 4x4"),
+        ("Fat loss", "HIIT 4x4 Cycling"),
+        ("Fat loss", "HIIT 4x4 Rowing"),
+        ("Strength", "Beginner Full Body"),
+        ("Strength", "Push Workout"),
+        ("Strength", "Pull Workout"),
+        ("Strength", "Leg Workout"),
+        ("Strength", "Hypertrophy Full Body"),
+        ("Strength", "Strength Upper"),
+        ("Strength", "Strength Squat"),
+        ("Strength", "Strength Deadlift"),
+        ("Strength", "Heavy Full Body"),
+        ("Strength", "Power Full Body"),
+        ("Size", "Beginner Full Body"),
+        ("Size", "Push Workout"),
+        ("Size", "Pull Workout"),
+        ("Size", "Leg Workout"),
+        ("Size", "Hypertrophy Full Body"),
+        ("Size", "Advanced Push"),
+        ("Size", "Advanced Pull"),
+        ("Size", "Advanced Legs")
+    };
+
+    var goalIds = context.LKP_TrainingGoal.ToDictionary(x => x.Description!, x => x.Id);
+    var templateIds = context.LKP_WorkoutTemplate.ToDictionary(x => x.Name, x => x.Id);
+    var existing = context.LKP_TemplateTrainingGoal
+        .Select(x => new { x.TemplateWorkoutId, x.TrainingGoalId })
+        .ToList();
+
+    foreach (var link in links)
+    {
+        int templateId = templateIds[link.Template];
+        int goalId = goalIds[link.Goal];
+        if (existing.Any(x => x.TemplateWorkoutId == templateId && x.TrainingGoalId == goalId))
+        {
+            continue;
+        }
+
+        context.LKP_TemplateTrainingGoal.Add(new TemplateTrainingGoal
+        {
+            TemplateWorkoutId = templateId,
+            TrainingGoalId = goalId
+        });
+    }
+
+    context.SaveChanges();
+}
+
+void SeedNoviceSchedule(EntityDBContext context)
+{
+    if (!context.LKP_WorkoutPeriod.Any() || !context.LKP_WorkoutTemplate.Any(x => x.Name == "Beginner Full Body"))
+    {
+        return;
+    }
+
+    var userIds = context.Database.SqlQueryRaw<string>("SELECT Id FROM AspNetUsers")
+        .ToList()
+        .Select(Guid.Parse)
+        .ToList();
+    if (userIds.Count == 0)
+    {
+        return;
+    }
+
+    int morningId = context.LKP_WorkoutPeriod.First(x => x.Description == "Morning").Id;
+    (DayOfWeek Day, string Workout)[] plan =
+    {
+        (DayOfWeek.Monday, "Beginner Full Body"),
+        (DayOfWeek.Tuesday, "Moderate Cardio"),
+        (DayOfWeek.Wednesday, "Beginner Full Body"),
+        (DayOfWeek.Thursday, "Moderate Cardio"),
+        (DayOfWeek.Friday, "Beginner Full Body"),
+        (DayOfWeek.Saturday, "Moderate Cardio")
+    };
+
+    foreach (var userId in userIds)
+    {
+        context.TRN_DOWWorkout.Where(x => x.UserId == userId).ExecuteDelete();
+        for (int index = 0; index < plan.Length; index++)
+        {
+            context.TRN_DOWWorkout.Add(new DOWWorkout
+            {
+                UserId = userId,
+                DayOfWeek = plan[index].Day,
+                WorkoutPeriodId = morningId,
+                TemplateWorkoutId = context.LKP_WorkoutTemplate.First(x => x.Name == plan[index].Workout).Id,
+                SortOrder = index + 1
+            });
+        }
+    }
+
+    context.SaveChanges();
 }
 
 void ApplyMigrations()

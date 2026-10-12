@@ -43,13 +43,24 @@
     <Columns>
         @foreach (var prop in _properties)
         {
-            var isVideo = prop.GetCustomAttribute<RenderAsAttribute>() != null;
+            var renderAs = prop.GetCustomAttribute<RenderAsAttribute>()?.Type;
+            var isVideo = renderAs == RenderType.Video;
+            var isLink = renderAs == RenderType.Link;
             var pKey = ReflectionHelper.GetDisplayName(prop).Equals("Nr");
 
             <TemplateColumn Title="@ReflectionHelper.GetDisplayName(prop)">
                 <CellTemplate>
                     <MudStack Row>
-                        @if (!isVideo && !pKey)
+                        @if (isLink)
+                        {
+                            var url = ReflectionHelper.GetValue(context.Item, prop)?.ToString();
+
+                            if (!string.IsNullOrWhiteSpace(url))
+                            {
+                                <MudLink Href="@url" Target="_blank">@url</MudLink>
+                            }
+                        }
+                        else if (!isVideo && !pKey)
                         {
                             @ReflectionHelper.GetValue(context.Item, prop)
                         }

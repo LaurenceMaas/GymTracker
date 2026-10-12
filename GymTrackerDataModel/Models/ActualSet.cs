@@ -15,7 +15,7 @@ namespace GymTrackerDataModel.Models
         public int Id { get; set; }
         public int ActualExerciseId { get; set; }
         public ActualExercise? ActualExercise { get; set; }
-        public int TemplateSetId { get; set; }
+        public int? TemplateSetId { get; set; }
         public TemplateSet? TemplateSet { get; set; }
         public int ExecutionOrder { get; set; }
         public bool Completed { get; set; }

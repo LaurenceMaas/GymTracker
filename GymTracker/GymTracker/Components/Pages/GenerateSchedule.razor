@@ -1,0 +1,383 @@
+@page "/schedule/generate"
+@using System.Reflection
+@using System.ComponentModel
+@using GymTrackerBusinessService.Repository
+@using GymTrackerBusinessService.Scheduling
+@using GymTrackerDataModel.Models
+@using GymTrackerHelpers
+@inject IGenerateScheduleWorkflow Workflow
+@inject IDialogService DialogService
+@inject AuthenticationStateProvider AuthStateProvider
+@inject ISnackbar Snackbar
+@inject NavigationManager NavigationManager
+
+<MudText Typo="Typo.h5" Class="mb-4">Generate Schedule</MudText>
+
+@if (_errors.Count > 0)
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4">
+        @foreach (string error in _errors)
+        {
+            <MudText>@error</MudText>
+        }
+    </MudAlert>
+}
+
+<MudPaper Outlined="true" Class="pa-4 mb-4">
+    <MudText Typo="Typo.h6">Training preferences</MudText>
+    <MudText Typo="Typo.body2" Class="mb-3">Choose a fitness level and one or more training goals, then generate a draft.</MudText>
+    @if (_state?.Preference != null)
+    {
+        @foreach (PropertyInfo prop in VisibleProperties(typeof(SchedulePreferenceVM)))
+        {
+            <MudText Typo="Typo.body1"><b>@ReflectionHelper.GetDisplayName(prop):</b> @ReflectionHelper.GetValue(_state.Preference, prop)</MudText>
+        }
+        @if (_state.Preference.Goals.Count == 0)
+        {
+            <MudText Typo="Typo.body2">No training goals selected.</MudText>
+        }
+        else
+        {
+            @foreach (SchedulePreferenceGoalVM goal in _state.Preference.Goals)
+            {
+                @foreach (PropertyInfo prop in VisibleProperties(typeof(SchedulePreferenceGoalVM)))
+                {
+                    <MudText Typo="Typo.body1"><b>@ReflectionHelper.GetDisplayName(prop):</b> @ReflectionHelper.GetValue(goal, prop)</MudText>
+                }
+            }
+        }
+    }
+    <MudStack Row="true" Class="mt-3">
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="EditPreferencesAsync">Edit preferences</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@(!CanGenerate)" OnClick="GenerateAsync">Generate</MudButton>
+    </MudStack>
+</MudPaper>
+
+@if (_state?.Proposal != null)
+{
+    <MudAlert Severity="Severity.Info" Class="mb-4">This is a draft proposal. It does not change your workout schedule until you accept it.</MudAlert>
+    <MudPaper Outlined="true" Class="pa-4 mb-4">
+        <MudText Typo="Typo.h6">Draft proposal</MudText>
+        @foreach (PropertyInfo prop in VisibleProperties(typeof(ScheduleProposalVM)))
+        {
+            <MudText Typo="Typo.body1"><b>@ReflectionHelper.GetDisplayName(prop):</b> @ReflectionHelper.GetValue(_state.Proposal, prop)</MudText>
+        }
+        @if (_state.Warnings.Count > 0)
+        {
+            <MudAlert Severity="Severity.Info" Class="mt-4" ContentAlignment="HorizontalAlignment.Start">
+                <MudText Typo="Typo.subtitle2">Warnings</MudText>
+                <MudText Typo="Typo.body2" Class="mb-2">These are recommendations. They do not block saving or accepting.</MudText>
+                @foreach (string warning in _state.Warnings)
+                {
+                    <MudText>@warning</MudText>
+                }
+            </MudAlert>
+        }
+        <MudText Typo="Typo.subtitle1" Class="mt-4">Proposed sessions</MudText>
+        <MudText Typo="Typo.body2" Class="mb-2">Submit in the editor keeps session edits on this page. Save changes stores the draft.</MudText>
+        @foreach (ScheduleProposalSlotVM slot in _state.Proposal.Slots)
+        {
+            <MudPaper Outlined="true" Class="pa-3 mt-2">
+                @foreach (PropertyInfo prop in VisibleProperties(typeof(ScheduleProposalSlotVM)))
+                {
+                    <MudText Typo="Typo.body2"><b>@ReflectionHelper.GetDisplayName(prop):</b> @ReflectionHelper.GetValue(slot, prop)</MudText>
+                }
+            </MudPaper>
+        }
+        <MudStack Row="true" Class="mt-4">
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="EditProposalAsync">Edit sessions</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveAsync">Save changes</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Success" OnClick="AcceptAsync">Accept</MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Error" OnClick="AbandonAsync">Abandon</MudButton>
+        </MudStack>
+    </MudPaper>
+}
+
+@code {
+    private GenerateScheduleState? _state;
+    private readonly List<string> _errors = new();
+    private Guid _userId;
+    private readonly DialogOptions _editorOptions = new() { MaxWidth = MaxWidth.Medium, FullWidth = true };
+
+    private bool CanGenerate => _state != null && _state.Preference.FitnessLevelId > 0 && _state.Preference.Goals.Any(item => item.TrainingGoalId > 0);
+
+    protected override async Task OnInitializedAsync()
+    {
+        AuthenticationState authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        if (authState.User.Identity?.IsAuthenticated == true)
+        {
+            _userId = Guid.Parse(authState.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)!.Value);
+            _state = await Workflow.LoadAsync(_userId);
+        }
+    }
+
+    private async Task EditPreferencesAsync()
+    {
+        if (_state == null)
+        {
+            return;
+        }
+
+        SchedulePreferenceVM editing = Clone(_state.Preference);
+        var parameters = new DialogParameters
+        {
+            { "model", editing },
+            { "viewModel", editing.Goals },
+            { "DetailName", "training goal" },
+            { "DisplayAddEdit", true },
+            { "LoadNewGridData", (Func<List<SchedulePreferenceGoalVM>, List<SchedulePreferenceGoalVM>>)AddGoal },
+            { "UpdateGridData", (Func<SchedulePreferenceGoalVM, List<SchedulePreferenceGoalVM>, Task<List<SchedulePreferenceGoalVM>>>)KeepGoals },
+            { "LoadGridDetailData", (Func<SchedulePreferenceGoalVM, Task<List<EmptyGridModel>>>)NoGoalDetails },
+            { "SaveHeaderData", (Func<SchedulePreferenceVM, Task>)(_ => Task.CompletedTask) },
+            { "SaveDetailData", (Func<List<SchedulePreferenceGoalVM>, int, Task<List<SchedulePreferenceGoalVM>>>)((rows, _) =>
+                {
+                    editing.Goals = rows;
+                    return Task.FromResult(rows);
+                }) }
+        };
+        IDialogReference dialog = await DialogService.ShowAsync<UpsertGridData<SchedulePreferenceVM, SchedulePreferenceGoalVM, EmptyGridModel>>("Training preferences", parameters, _editorOptions);
+        DialogResult? result = await dialog.Result;
+        if (result is { Canceled: false })
+        {
+            await Workflow.PopulatePreferenceDisplayAsync(editing);
+            _state = new GenerateScheduleState
+            {
+                Preference = editing,
+                Proposal = _state.Proposal,
+                Warnings = _state.Warnings
+            };
+        }
+    }
+
+    private async Task EditProposalAsync()
+    {
+        if (_state?.Proposal == null)
+        {
+            return;
+        }
+
+        ScheduleProposalVM editing = Clone(_state.Proposal);
+        var parameters = new DialogParameters
+        {
+            { "model", editing },
+            { "viewModel", editing.Slots },
+            { "DetailName", "session" },
+            { "DisplayAddEdit", true },
+            { "LoadNewGridData", (Func<List<ScheduleProposalSlotVM>, List<ScheduleProposalSlotVM>>)AddSlot },
+            { "UpdateGridData", (Func<ScheduleProposalSlotVM, List<ScheduleProposalSlotVM>, Task<List<ScheduleProposalSlotVM>>>)KeepSlots },
+            { "LoadGridDetailData", (Func<ScheduleProposalSlotVM, Task<List<EmptyGridModel>>>)NoSlotDetails },
+            { "SaveHeaderData", (Func<ScheduleProposalVM, Task>)(_ => Task.CompletedTask) },
+            { "SaveDetailData", (Func<List<ScheduleProposalSlotVM>, int, Task<List<ScheduleProposalSlotVM>>>)((rows, _) =>
+                {
+                    editing.Slots = rows;
+                    return Task.FromResult(rows);
+                }) }
+        };
+        IDialogReference dialog = await DialogService.ShowAsync<UpsertGridData<ScheduleProposalVM, ScheduleProposalSlotVM, EmptyGridModel>>("Edit draft schedule", parameters, _editorOptions);
+        DialogResult? result = await dialog.Result;
+        if (result is { Canceled: false })
+        {
+            await Workflow.PopulateSlotDisplayAsync(editing.Slots);
+            _state = new GenerateScheduleState
+            {
+                Preference = _state.Preference,
+                Proposal = editing,
+                Warnings = _state.Warnings
+            };
+        }
+    }
+
+    private async Task GenerateAsync()
+    {
+        if (_state == null)
+        {
+            return;
+        }
+
+        bool replaceExistingDraft = false;
+        if (_state.HasDraft)
+        {
+            bool confirmed = await ConfirmAsync(
+                "Generate schedule",
+                GenerateScheduleWorkflow.ReplaceDraftConfirmation,
+                "Generate",
+                Color.Warning);
+            if (!confirmed)
+            {
+                return;
+            }
+
+            replaceExistingDraft = true;
+        }
+
+        await ApplyAsync(await Workflow.GenerateAsync(_userId, _state.Preference, replaceExistingDraft), "Draft schedule generated.");
+    }
+
+    private async Task SaveAsync()
+    {
+        if (_state?.Proposal == null)
+        {
+            return;
+        }
+
+        await ApplyAsync(await Workflow.SaveSlotsAsync(_userId, _state.Proposal.Id, _state.Proposal.Slots), "Draft schedule saved.");
+    }
+
+    private async Task AcceptAsync()
+    {
+        if (_state?.Proposal == null)
+        {
+            return;
+        }
+
+        bool confirmed = await ConfirmAsync(
+            "Accept schedule",
+            "Accept this schedule? Your current workout schedule will be replaced. Your workout history will not be changed.",
+            "Accept",
+            Color.Success);
+        if (!confirmed)
+        {
+            return;
+        }
+
+        GenerateScheduleCommand command = await Workflow.AcceptAsync(_userId, _state.Proposal.Id, _state.Proposal.Slots);
+        Show(command, "Schedule accepted.");
+        if (command.Succeeded)
+        {
+            NavigationManager.NavigateTo("/manage/workoutschedule");
+        }
+    }
+
+    private async Task AbandonAsync()
+    {
+        if (_state?.Proposal == null)
+        {
+            return;
+        }
+
+        bool confirmed = await ConfirmAsync(
+            "Abandon draft",
+            "Abandon this draft proposal? Your workout schedule will not be changed.",
+            "Abandon",
+            Color.Error);
+        if (!confirmed)
+        {
+            return;
+        }
+
+        await ApplyAsync(await Workflow.AbandonAsync(_userId), "Draft proposal abandoned.");
+    }
+
+    private async Task ApplyAsync(GenerateScheduleCommand command, string successMessage)
+    {
+        Show(command, successMessage);
+        _state = command.State;
+        await Task.CompletedTask;
+    }
+
+    private void Show(GenerateScheduleCommand command, string successMessage)
+    {
+        _errors.Clear();
+        if (command.Succeeded)
+        {
+            Snackbar.Add(successMessage, Severity.Success);
+            return;
+        }
+
+        foreach (string error in command.Errors)
+        {
+            _errors.Add(error);
+            Snackbar.Add(error, Severity.Error);
+        }
+    }
+
+    private async Task<bool> ConfirmAsync(string title, string text, string button, Color color)
+    {
+        var parameters = new DialogParameters<ConfirmDelete>
+        {
+            { item => item.ContentText, text },
+            { item => item.ButtonText, button },
+            { item => item.Color, color }
+        };
+        IDialogReference dialog = await DialogService.ShowAsync<ConfirmDelete>(title, parameters, new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small });
+        DialogResult? result = await dialog.Result;
+        return result != null && !result.Canceled;
+    }
+
+    private static List<SchedulePreferenceGoalVM> AddGoal(List<SchedulePreferenceGoalVM> rows)
+    {
+        rows.Add(new SchedulePreferenceGoalVM());
+        return rows;
+    }
+
+    private static Task<List<SchedulePreferenceGoalVM>> KeepGoals(SchedulePreferenceGoalVM item, List<SchedulePreferenceGoalVM> rows)
+    {
+        return Task.FromResult(rows);
+    }
+
+    private static Task<List<EmptyGridModel>> NoGoalDetails(SchedulePreferenceGoalVM item)
+    {
+        return Task.FromResult(new List<EmptyGridModel>());
+    }
+
+    private static List<ScheduleProposalSlotVM> AddSlot(List<ScheduleProposalSlotVM> rows)
+    {
+        rows.Add(new ScheduleProposalSlotVM { SortOrder = rows.Count + 1 });
+        return rows;
+    }
+
+    private static Task<List<ScheduleProposalSlotVM>> KeepSlots(ScheduleProposalSlotVM item, List<ScheduleProposalSlotVM> rows)
+    {
+        return Task.FromResult(rows);
+    }
+
+    private static Task<List<EmptyGridModel>> NoSlotDetails(ScheduleProposalSlotVM item)
+    {
+        return Task.FromResult(new List<EmptyGridModel>());
+    }
+
+    private static SchedulePreferenceVM Clone(SchedulePreferenceVM source)
+    {
+        return new SchedulePreferenceVM
+        {
+            FitnessLevelId = source.FitnessLevelId,
+            FitnessLevel = source.FitnessLevel,
+            WeeklyTraining = source.WeeklyTraining,
+            Goals = source.Goals.Select(item => new SchedulePreferenceGoalVM
+            {
+                TrainingGoalId = item.TrainingGoalId,
+                TrainingGoal = item.TrainingGoal
+            }).ToList()
+        };
+    }
+
+    private static ScheduleProposalVM Clone(ScheduleProposalVM source)
+    {
+        return new ScheduleProposalVM
+        {
+            Id = source.Id,
+            RecommendedSessionCount = source.RecommendedSessionCount,
+            Explanation = source.Explanation,
+            Slots = source.Slots.Select(item => new ScheduleProposalSlotVM
+            {
+                DayOfWeek = item.DayOfWeek,
+                WorkoutPeriodId = item.WorkoutPeriodId,
+                WorkoutPeriod = item.WorkoutPeriod,
+                TemplateWorkoutId = item.TemplateWorkoutId,
+                TemplateWorkout = item.TemplateWorkout,
+                SortOrder = item.SortOrder
+            }).ToList()
+        };
+    }
+
+    private static IEnumerable<PropertyInfo> VisibleProperties(Type type)
+    {
+        return type.GetProperties().Where(prop =>
+            (prop.PropertyType.IsPrimitive
+            || prop.PropertyType == typeof(string)
+            || prop.PropertyType == typeof(DateTime)
+            || prop.PropertyType.IsValueType)
+            && prop.GetCustomAttribute<IgnoreInGridAttribute>() == null
+            || prop.GetCustomAttribute<NavigationPropertyAttribute>() != null);
+    }
+}

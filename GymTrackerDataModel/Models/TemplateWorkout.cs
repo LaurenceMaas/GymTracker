@@ -20,7 +20,16 @@ namespace GymTrackerDataModel.Models
         [MaxLength(250)]
         [DisplayName("Workout Name")]
         public string Name { get; set; } = "";
+        [IgnoreInGrid]
+        public int FitnessLevelId { get; set; }
+        [DisplayName("Level")]
+        [NavigationProperty(typeof(FitnessLevel), TextField = "Description")]
+        public FitnessLevel FitnessLevel { get; set; } = null!;
         public string? Notes { get; set; }
+        [MaxLength(1000)]
+        [DisplayName("Reference")]
+        [RenderAs(RenderType.Link)]
+        public string? Reference { get; set; }
         public ICollection<TemplateExercise> Exercises { get; set; } = new List<TemplateExercise>();
     }
 }

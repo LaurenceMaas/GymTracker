@@ -15,10 +15,12 @@ namespace GymTrackerDataModel.Models
         public int Id { get; set; }
         public int ActualWorkoutId { get; set; }
         public ActualWorkout? ActualWorkout { get; set; }
-        public int TemplateExerciseId { get; set; }
-        public TemplateExercise? TemplateExercise { get; set; }
-        public int ActualTemplateExerciseId { get; set; }
-        public TemplateExercise? ActualTemplateExercise { get; set; }
+        public int ExerciseId { get; set; }
+        public Exercise? Exercise { get; set; }
+        [MaxLength(250)]
+        public string ExerciseName { get; set; } = "";
+        [MaxLength(500)]
+        public string? ExerciseType { get; set; }
         public DateTime Createdatetime { get; set; }
     }
 }

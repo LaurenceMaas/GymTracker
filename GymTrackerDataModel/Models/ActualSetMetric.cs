@@ -16,8 +16,8 @@ namespace GymTrackerDataModel.Models
         public int Id { get; set; }
         public int ActualSetId { get; set; }
         public ActualSet? ActualSet { get; set; }
-        public int TemplateSetMetricId { get; set; }
-        public TemplateSetMetric? TemplateSetMetric { get; set; }
+        public int MetricId { get; set; }
+        public Metric? Metric { get; set; }
         [MaxLength(255)]
         public string? PlannedTextValue { get; set; }
         public decimal PlannedNumericValue { get; set; }

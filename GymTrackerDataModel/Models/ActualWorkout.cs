@@ -17,11 +17,11 @@ namespace GymTrackerDataModel.Models
         public int Id { get; set; }
         [IgnoreInGrid]
         public Guid PerformedByUserId { get; set; }
-        [IgnoreInGrid]
-        public int DOWWorkoutId { get; set; }
-        [DisplayName("Workout")]
-        [NavigationProperty(typeof(DOWWorkout), TextField = "Name")]
-        public DOWWorkout? DOWWorkout { get; set; }
+        public DayOfWeek DayOfWeek { get; set; }
+        [MaxLength(250)]
+        public string WorkoutName { get; set; } = "";
+        public int? TemplateWorkoutId { get; set; }
+        public TemplateWorkout? TemplateWorkout { get; set; }
         public DateTime WorkoutStartDate { get; set; }
         public TimeSpan WorkoutStartTime { get; set; }
         public DateTime? WorkoutEndDate { get; set; }

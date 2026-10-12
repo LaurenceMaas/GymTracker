@@ -1,5 +1,4 @@
 ﻿@using System.Net.Http.Json
-@using GymTrackerBusinessService.Generic
 @using GymTrackerDataModel.Models
 @using System.Linq.Expressions;
 @using System.Reflection;
@@ -11,7 +10,6 @@
 @typeparam TEntity
 @typeparam TGridEntity
 @typeparam TGridEntityDetails
-@inject IGenericRepoService<TEntity> repo
 @inject AuthenticationStateProvider AuthStateProvider
 @inject NavigationManager NavigationManager
 @inject IServiceProvider ServiceProvider
@@ -25,6 +23,7 @@
                     {
                         var isNav = prop.GetCustomAttribute<NavigationPropertyAttribute>() != null;
                         var isKey = prop.GetCustomAttribute<KeyAttribute>() != null;
+                        var isReadOnly = prop.GetCustomAttribute<ReadOnlyAttribute>() != null;
                         var type = prop.PropertyType;
                         if (!isNav)
                         {
@@ -51,6 +50,7 @@
                                                   ValueChanged="@(v => SetCardValue(prop, v))"
                                                   For="@( (Expression<Func<string>>)ReflectionHelper.GetExpression(prop, model!) )"
                                                   Label="@ReflectionHelper.GetDisplayName(prop)"
+                                                  ReadOnly="@isReadOnly"
                                                   Immediate="true"
                                                   MaxLines="10"
                                                   Sizing="InputSizing.Auto"
@@ -65,6 +65,7 @@
                                                      ValueChanged="@(v => SetCardValue(prop, v))"
                                                      For="@( (Expression<Func<int>>)ReflectionHelper.GetExpression(prop, model!) )"
                                                      Label="@ReflectionHelper.GetDisplayName(prop)"
+                                                     ReadOnly="@isReadOnly"
                                                      Variant="Variant.Outlined"
                                                      FullWidth="true"
                                                      Margin="Margin.Dense" />
@@ -87,7 +88,7 @@
                                                ValueChanged="@(v => SetCardValue(prop, v))"
                                                FullWidth="true"
                                                Margin="Margin.Dense"
-                                               Value="@(GetValue(prop) is DayOfWeek i? (i==0 ? DayOfWeek.Monday:i) : DayOfWeek.Monday)">
+                                               Value="@(GetValue(prop) is DayOfWeek day ? day : DayOfWeek.Monday)">
                                         @foreach (var day in Enum.GetValues<DayOfWeek>())
                                         {
                                             <MudSelectItem Value="@day">@day</MudSelectItem>
@@ -100,24 +101,26 @@
                         {
                             var fkProp = ReflectionHelper.GetForeignKey<TEntity>(prop);
                             var items = _navData.ContainsKey(prop.Name) ? _navData[prop.Name] : Enumerable.Empty<object>();
+                            @if (fkProp != null && items.Any())
+                            {
+                                <MudSelect T="int"
+                                           Value="@(GetValue(fkProp) is int selected ? selected : 1)"
+                                           ValueChanged="@(v => SetCardValue(fkProp, v))"
+                                           Variant="Variant.Outlined"
+                                           Label="@ReflectionHelper.GetDisplayName(prop)"
+                                           FullWidth="true"
+                                           Margin="Margin.Dense"
+                                           ToStringFunc="@(id => GetDisplayText(fkProp.Name, id))">
 
-                            <MudSelect T="int"
-                                       Value="@(GetValue(fkProp) is int i ? (i==0 ? 1:i) : 1)"
-                                       ValueChanged="@(v => SetCardValue(fkProp, v))"
-                                       Variant="Variant.Outlined"
-                                       Label="@ReflectionHelper.GetDisplayName(prop)"
-                                       FullWidth="true"
-                                       Margin="Margin.Dense"
-                                       ToStringFunc="@(id => GetDisplayText(fkProp.Name, id))">
-
-                                @foreach (var item in items)
-                                {
-                                    var id = (int)item.GetType().GetProperty("Id")!.GetValue(item)!;
-                                    <MudSelectItem Value="@id">
-                                        @ReflectionHelper.GetDisplayProperty(item)
-                                    </MudSelectItem>
-                                }
-                            </MudSelect>
+                                    @foreach (var item in items)
+                                    {
+                                        var id = (int)item.GetType().GetProperty("Id")!.GetValue(item)!;
+                                        <MudSelectItem Value="@id">
+                                            @ReflectionHelper.GetDisplayProperty(item)
+                                        </MudSelectItem>
+                                    }
+                                </MudSelect>
+                            }
                         }
                     }
                 </MudStack>

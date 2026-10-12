@@ -53,11 +53,15 @@ namespace GymTrackerHelpers
             var value = prop.GetValue(item);
 
             if (value is DateTime dt)
-                return dt.ToString("yyyy-MM-dd");
+                //   return dt.ToString("yyyy-MM-dd");
+                return dt.ToString();
 
             // Handle navigation property
             if (prop.GetCustomAttribute<NavigationPropertyAttribute>() != null)
             {
+                if (value == null)
+                    return "";
+
                 // Try to get "Description" or "Name"
                 var navProp = value.GetType().GetProperty("Description")
                            ?? value.GetType().GetProperty("Name");

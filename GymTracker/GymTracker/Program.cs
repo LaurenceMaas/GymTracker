@@ -14,6 +14,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MudBlazor.Services;
 using GymTrackerBusinessService.Repository;
+using GymTrackerBusinessService.Scheduling;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -65,6 +66,13 @@ builder.Services.AddScoped(typeof(IExerciseService), typeof(ExerciseService));
 builder.Services.AddScoped(typeof(IWorkoutScheduleService), typeof(WorkoutScheduleService));
 builder.Services.AddScoped(typeof(IWorkoutHistoryService), typeof(WorkoutHistory));
 builder.Services.AddScoped(typeof(ILogWorkOutService), typeof(LogWorkOutService));
+builder.Services.AddScoped(typeof(ITrainingPreferenceService), typeof(TrainingPreferenceService));
+builder.Services.AddScoped(typeof(ScheduleProposalValidator), typeof(ScheduleProposalValidator));
+builder.Services.Configure<ScheduleAdvisorOptions>(builder.Configuration.GetSection("ScheduleAdvisor"));
+builder.Services.AddHttpClient<IScheduleLanguageModel, OpenAiScheduleLanguageModel>();
+builder.Services.AddScoped(typeof(IScheduleAdvisor), typeof(CatalogScheduleAdvisor));
+builder.Services.AddScoped(typeof(IScheduleProposalService), typeof(ScheduleProposalService));
+builder.Services.AddScoped(typeof(IGenerateScheduleWorkflow), typeof(GenerateScheduleWorkflow));
 
 
 builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("EmailSettings"));

@@ -1,6 +1,7 @@
 ﻿using GymTrackerDataModel;
 using GymTrackerDataModel.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion.Internal;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -28,7 +29,8 @@ namespace GymTrackerBusinessService.Repository
         [DisplayName("Workout Start")]
         public DateTime WorkoutStrtDtTime { get; set; }
         [DisplayName("Workout End")]
-        public DateTime WorkoutEndDtTime { get; set; }
+        public DateTime? WorkoutEndDtTime { get; set; }
+        public string Status { get; set; } = string.Empty;
         public string? Notes { get; set; }
     }
 
@@ -37,57 +39,34 @@ namespace GymTrackerBusinessService.Repository
     {
         protected EntityDBContext _context = null;
         protected DbSet<ActualWorkout> _awTable = null;
-        protected DbSet<DOWWorkout> _dwTable = null;
-        protected DbSet<TemplateWorkout> _twTable = null;
+        protected DbSet<WorkOutStatus> _wsTable = null;
         public WorkoutHistory(EntityDBContext context)
         {
             _context = context;
             _awTable = _context.Set<ActualWorkout>();
-            _dwTable = _context.Set<DOWWorkout>();
-            _twTable = _context.Set<TemplateWorkout>(); 
+            _wsTable= _context.Set<WorkOutStatus>();
         }
 
-        Task<List<WorkoputHeaderDisplayVM>> IWorkoutHistoryService.LoadWorkoutHistoryPerUser(string UserId)
+        public async Task<List<WorkoputHeaderDisplayVM>> LoadWorkoutHistoryPerUser(string UserId)
         {
-            throw new NotImplementedException();
+            return await
+            (
+            from actualWorkout in _awTable
+            join workoutStatus in _wsTable on actualWorkout.WorkOutStatusId equals workoutStatus.Id
+            where actualWorkout.PerformedByUserId.ToString().ToUpper().Equals(UserId.ToUpper())
+            orderby actualWorkout.WorkoutStartDate descending, actualWorkout.WorkoutStartTime descending
+            select new WorkoputHeaderDisplayVM
+            {
+                TemplateWorkoutId = 0,
+                DayOfWeek = actualWorkout.DayOfWeek,
+                WorkoutStrtDtTime = new DateTime(DateOnly.FromDateTime(actualWorkout.WorkoutStartDate), TimeOnly.FromTimeSpan(actualWorkout.WorkoutStartTime)),
+                WorkoutEndDtTime = actualWorkout.WorkoutEndDate == null || actualWorkout.WorkoutEndTime == null
+                    ? null
+                    : new DateTime(DateOnly.FromDateTime(actualWorkout.WorkoutEndDate.Value), TimeOnly.FromTimeSpan(actualWorkout.WorkoutEndTime.Value)),
+                Notes = actualWorkout.Notes,
+                WorkoutName = actualWorkout.WorkoutName,
+                Status = workoutStatus.Description
+            }).ToListAsync();
         }
-        //public async Task<List<WorkoputHeaderDisplayVM>> LoadWorkoutHistoryPerUser(string UserId)
-        //{
-        //    var WorkoputHeaderDisplayVM = await
-        //    (
-        //    from actualWorkout in _awTable
-        //    join dowWorkout in _dwTable on actualWorkout.DOWWorkoutId equals dowWorkout.Id
-        //    join templateworkout in _twTable on dowWorkout.TemplateWorkoutId equals templateworkout.Id
-        //    where dowWorkout.UserId.Equals(UserId)
-        //    select new
-        //    {
-        //        TemplateWorkoutId = dowWorkout.TemplateWorkoutId,
-        //        DayOfWeek = dowWorkout.DayOfWeek,
-        //        WorkoutStrtDtTime = new DateTime(DateOnly.FromDateTime(actualWorkout.WorkoutStartTime), TimeOnly.FromTimeSpan(actualWorkout.WorkoutStartTime)),
-        //        WorkoutEndDtTime = new DateTime(DateOnly.FromDateTime(actualWorkout.WorkoutEndDate), TimeOnly.FromTimeSpan(actualWorkout.WorkoutEndTime)),
-        //        Notes = actualWorkout.Notes,
-        //        WorkoutName = templateworkout.Name
-        //    }).ToListAsync();
-
-        //    return WorkoputHeaderDisplayVM.GroupBy(x => new
-        //    {
-        //        x.TemplateWorkoutId,
-        //        x.DayOfWeek,
-        //        x.WorkoutStrtDtTime,
-        //        x.WorkoutEndDtTime,
-        //        x.Notes,
-        //        x.WorkoutName
-        //    }).Select( y=> new WorkoputHeaderDisplayVM 
-        //    {
-        //        TemplateWorkoutId = y.Key.TemplateWorkoutId,
-        //        DayOfWeek = y.Key.DayOfWeek,
-        //        WorkoutStrtDtTime = y.Key.WorkoutStrtDtTime,
-        //        WorkoutEndDtTime = y.Key.WorkoutEndDtTime,   
-        //        Notes = y.Key.Notes,
-        //        WorkoutName = y.Key.WorkoutName
-        //    }).ToList(); 
-
-
-        //}
     }
 }

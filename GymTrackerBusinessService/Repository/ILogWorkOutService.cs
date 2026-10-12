@@ -143,16 +143,18 @@ namespace GymTrackerBusinessService.Repository
                 return new List<LogWorkoutLogExerciseVM>();
             }
 
+            var templateId = aw.TemplateWorkoutId ?? workOutTemplateId;
+
             var logExerciseVM =
             (
             await
             (
             from templateExercise in _tetable
             join exercise in _etable on templateExercise.ExerciseId equals exercise.Id
-            join actualExerciseGroup in _aetable.Where(x => x.ActualWorkoutId == aw.Id) on templateExercise.Id equals actualExerciseGroup.TemplateExerciseId
+            join actualExerciseGroup in _aetable.Where(x => x.ActualWorkoutId == aw.Id) on templateExercise.ExerciseId equals actualExerciseGroup.ExerciseId
             into actualExerciseJoin
             from actualExercise in actualExerciseJoin.DefaultIfEmpty()
-            where templateExercise.WorkoutTemplateId == workOutTemplateId
+            where templateExercise.WorkoutTemplateId == templateId
             select new
             {
                 TemplateExerciseId = templateExercise.Id,
@@ -198,7 +200,6 @@ namespace GymTrackerBusinessService.Repository
             StringBuilder plannedSB = new StringBuilder();
             int cnt;
             string at = string.Empty;
-            string planned = string.Empty;
             LogWorkoutSetVM logWorkoutSetVM;
 
             var rdbData = (await
@@ -214,8 +215,8 @@ namespace GymTrackerBusinessService.Repository
                 MetricId = metric.Id,
                 MetricName = metric.Name,
                 NumericValue = templateSetMetric.NumericValue,
-                TextValue = templateSetMetric.TextValue,
                 Unit = metric.Unit,
+                TextValue = templateSetMetric.TextValue,
                 Order = templateSet.Order,
                 TemplateSetMetricId = templateSetMetric.Id
             }
@@ -249,46 +250,51 @@ namespace GymTrackerBusinessService.Repository
                         : $"{m.MetricName} ({m.TextValue})"
                 }).ToList()
             })
-            .OrderBy(x => x.SetNumber)
             .ToList();
 
             for (int i = 0; i < formattedData.Count; i++)
             {
                 plannedSB.Clear();
-                formattedData.ElementAt(i).SetNumber = (i + 1);
+                logWorkoutSetVM = formattedData[i];
+                logWorkoutSetVM.SetNumber = (i + 1);
                 cnt = 1;
-                logWorkoutSetVM = formattedData.ElementAt(i);
-                foreach (var setMetric in logWorkoutSetVM.LogWorkoutSetMetricVMs)
-                {
-                    at = cnt == formattedData.ElementAt(i).LogWorkoutSetMetricVMs.Count ? "" : " @\r\n";
-                    plannedSB.Append((setMetric.PlannedNumericValue != null ? setMetric.PlannedNumericValue : "" + setMetric.PlannedTextValue) + " " + setMetric.Unit + " " + setMetric.MetricName + at);
-
-                    var actualSetMetric = (await
-                    (from actualMet in _amtable
-                     where (actualMet.TemplateSetMetricId == setMetric.TemplateSetMetricId)
-                     select new
-                     {
-                         ActualNumericValue = actualMet.ActualNumericValue,
-                         ActualTextValue = actualMet.ActualTextValue
-                     }
-                    ).ToListAsync()).FirstOrDefault() ?? null;
-
-                    if (actualSetMetric != null)
-                    {
-                        setMetric.ActualNumericValue = actualSetMetric.ActualNumericValue;
-                        setMetric.ActualTextValue = actualSetMetric.ActualTextValue;
-                    }
-                    cnt++;
-                }
 
                 var readComplete = (await (from actualSet in _astable
                                            where (actualSet.ActualExerciseId == workoutLogExerciseVM.ActualExerciseId
                                            && actualSet.TemplateSetId == logWorkoutSetVM.TemplateSetId)
                                            select new
                                            {
+                                               actualSet.Id,
                                                Completed = actualSet.Completed
                                            }
                 ).ToListAsync()).FirstOrDefault();
+
+                foreach (var setMetric in logWorkoutSetVM.LogWorkoutSetMetricVMs)
+                {
+                    at = cnt == logWorkoutSetVM.LogWorkoutSetMetricVMs.Count ? "" : " @\r\n";
+                    plannedSB.Append((setMetric.PlannedNumericValue != null ? setMetric.PlannedNumericValue : "" + setMetric.PlannedTextValue) + " " + setMetric.Unit + " " + setMetric.MetricName + at);
+
+                    if (readComplete != null)
+                    {
+                        var actualSetMetric = (await
+                        (from actualMet in _amtable
+                         where actualMet.ActualSetId == readComplete.Id
+                         && actualMet.MetricId == setMetric.MetricId
+                         select new
+                         {
+                             ActualNumericValue = actualMet.ActualNumericValue,
+                             ActualTextValue = actualMet.ActualTextValue
+                         }
+                        ).ToListAsync()).FirstOrDefault();
+
+                        if (actualSetMetric != null)
+                        {
+                            setMetric.ActualNumericValue = actualSetMetric.ActualNumericValue;
+                            setMetric.ActualTextValue = actualSetMetric.ActualTextValue;
+                        }
+                    }
+                    cnt++;
+                }
 
                 logWorkoutSetVM.Complete = readComplete == null ? false : readComplete.Completed;
                 logWorkoutSetVM.PlannedSetMetrics = plannedSB.ToString();
@@ -303,11 +309,23 @@ namespace GymTrackerBusinessService.Repository
             int woId = GetCurrentWorkout(user).Id;
             if (woId == 0)
             {
+                var schedule = _dwtable
+                    .Where(dow => dow.Id == DOWWorkoutId)
+                    .Select(dow => new
+                    {
+                        dow.DayOfWeek,
+                        dow.TemplateWorkoutId,
+                        Name = dow.TemplateWorkout.Name
+                    })
+                    .FirstOrDefault();
+
                 ActualWorkout actualWorkoutSave = new ActualWorkout()
                 {
                     Id = 0,
                     PerformedByUserId = user,
-                    DOWWorkoutId = DOWWorkoutId,
+                    TemplateWorkoutId = schedule?.TemplateWorkoutId,
+                    DayOfWeek = schedule?.DayOfWeek ?? startDateTime.DayOfWeek,
+                    WorkoutName = schedule?.Name ?? "",
                     WorkoutStartDate = startDateTime.Date,
                     WorkoutStartTime = startDateTime.TimeOfDay,
                     WorkoutEndDate = null,
@@ -351,26 +369,29 @@ namespace GymTrackerBusinessService.Repository
         }
         public ActualWorkout GetCurrentWorkout(Guid user)
         {
-            int workoutPeriod = (from woPeriod in _wptable
+            var workoutPeriod = (from woPeriod in _wptable
                                  where DateTime.Now.TimeOfDay >= woPeriod.StartTime
                                  && DateTime.Now.TimeOfDay < woPeriod.EndTime
                                  select new
                                  {
-                                     Id = woPeriod.Id
-                                 }).ToList().FirstOrDefault().Id;
+                                     woPeriod.StartTime,
+                                     woPeriod.EndTime
+                                 }).ToList().FirstOrDefault();
 
             var queryRes =
             (
             from actualWorkout in _awtable
-            join dowworkout in _dwtable on actualWorkout.DOWWorkoutId equals dowworkout.Id
             where actualWorkout.PerformedByUserId == user
             && DateOnly.FromDateTime(actualWorkout.WorkoutStartDate) == DateOnly.FromDateTime(DateTime.Now)
-            && dowworkout.WorkoutPeriodId == workoutPeriod
+            && actualWorkout.WorkoutStartTime >= workoutPeriod.StartTime
+            && actualWorkout.WorkoutStartTime < workoutPeriod.EndTime
             select new ActualWorkout
             {
                 Id = actualWorkout.Id,
                 PerformedByUserId = actualWorkout.PerformedByUserId,
-                DOWWorkoutId = actualWorkout.DOWWorkoutId,
+                DayOfWeek = actualWorkout.DayOfWeek,
+                WorkoutName = actualWorkout.WorkoutName,
+                TemplateWorkoutId = actualWorkout.TemplateWorkoutId,
                 WorkoutStartDate = actualWorkout.WorkoutStartDate,
                 WorkoutStartTime = actualWorkout.WorkoutStartTime,
                 WorkoutEndDate = actualWorkout.WorkoutEndDate,
@@ -400,11 +421,31 @@ namespace GymTrackerBusinessService.Repository
             IGenericRepoService<ActualSet> actSetRepoServ = new GenericRepoService<ActualSet>(new EntityDBContext(_optionsBuilder.Options));
             IGenericRepoService<ActualSetMetric> actSetMetRepoServ = new GenericRepoService<ActualSetMetric>(new EntityDBContext(_optionsBuilder.Options));
 
+            var exerciseSnapshot = await
+            (
+                from templateExercise in _tetable
+                join exercise in _etable on templateExercise.ExerciseId equals exercise.Id
+                join exerciseType in _ettable on exercise.ExerciseTypeId equals exerciseType.Id into exerciseTypes
+                from exerciseType in exerciseTypes.DefaultIfEmpty()
+                where templateExercise.Id == set.TemplateExerciseId
+                select new
+                {
+                    exercise.Id,
+                    exercise.Name,
+                    TypeName = exerciseType.Description
+                }
+            ).FirstOrDefaultAsync();
+
+            if (exerciseSnapshot == null)
+            {
+                return;
+            }
+
             var existingActExercise = (
             await
             (
             from actExercises in _aetable
-            where actExercises.TemplateExerciseId == set.TemplateExerciseId && actExercises.ActualWorkoutId == actualWOId
+            where actExercises.ExerciseId == exerciseSnapshot.Id && actExercises.ActualWorkoutId == actualWOId
             select new
             {
                 Id = actExercises.Id,
@@ -418,8 +459,9 @@ namespace GymTrackerBusinessService.Repository
             ActualExercise actExercise = new ActualExercise()
             {
                 Id = existingActExercise.Id,
-                TemplateExerciseId = set.TemplateExerciseId,
-                ActualTemplateExerciseId = set.TemplateExerciseId,
+                ExerciseId = exerciseSnapshot.Id,
+                ExerciseName = exerciseSnapshot.Name,
+                ExerciseType = exerciseSnapshot.TypeName,
                 ActualWorkoutId = actualWOId,
                 Createdatetime = DateTime.Now
             };
@@ -475,7 +517,7 @@ namespace GymTrackerBusinessService.Repository
                     var existingMetric = (await
                     (
                     from actMetric in _amtable
-                    where (metric.TemplateSetMetricId == actMetric.TemplateSetMetricId)
+                    where actMetric.ActualSetId == actualSet.Id && actMetric.MetricId == metric.MetricId
                     select new
                     {
                         Id = actMetric.Id
@@ -489,7 +531,7 @@ namespace GymTrackerBusinessService.Repository
                     {
                         Id = existingMetric.Id,
                         ActualSetId = actualSet.Id,
-                        TemplateSetMetricId = metric.TemplateSetMetricId,
+                        MetricId = metric.MetricId,
                         PlannedTextValue = metric.PlannedTextValue,
                         PlannedNumericValue = metric.PlannedNumericValue ?? 0,
                         ActualTextValue = metric.ActualTextValue,

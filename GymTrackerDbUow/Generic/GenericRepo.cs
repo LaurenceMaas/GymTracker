@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using GymTrackerDbUow.Generic;
 using GymTrackerDataModel.Models;
+using System.Linq.Expressions;
 using System.Reflection;
 
 namespace GymTrackerDbUOW
@@ -57,7 +58,7 @@ namespace GymTrackerDbUOW
                 query = query.Include(prop.Name);
             }
 
-            return await query.ToListAsync();
+            return await query.AsNoTracking().ToListAsync();
         }
         //This method will return the specified record from the table
         //based on the ID which it received as an argument
@@ -101,19 +102,33 @@ namespace GymTrackerDbUOW
         {
             try
             {
-                var local = _context.Set<T>().Local
-                .FirstOrDefault(e => GetPrimaryKeyValue(e).Equals(GetPrimaryKeyValue(obj)));
+                //var local = _context.Set<T>().Local
+                //.FirstOrDefault(e => GetPrimaryKeyValue(e).Equals(GetPrimaryKeyValue(obj)));
 
-                if (local != null)
+                //if (local != null)
+                //{
+                //    // Detach the already tracked local entity
+                //    _context.Entry(local).State = EntityState.Detached;
+                //}
+
+                //// Attach the new object and mark it as modified
+                //_context.Set<T>().Attach(obj);
+                //_context.Entry(obj).State = EntityState.Modified;
+
+                //await _context.SaveChangesAsync();
+                foreach (var prop in typeof(T).GetProperties())
                 {
-                    // Detach the already tracked local entity
-                    _context.Entry(local).State = EntityState.Detached;
+                    if (prop.GetCustomAttribute<NavigationPropertyAttribute>() != null)
+                        prop.SetValue(obj, null);
                 }
-
-                // Attach the new object and mark it as modified
+                var local = _context.Set<T>().Local
+                    .FirstOrDefault(e => GetPrimaryKeyValue(e).Equals(GetPrimaryKeyValue(obj)));
+                
+                if (local != null)
+                    _context.Entry(local).State = EntityState.Detached;
+                
                 _context.Set<T>().Attach(obj);
                 _context.Entry(obj).State = EntityState.Modified;
-
                 await _context.SaveChangesAsync();
             }
             catch (Exception ex)
@@ -164,6 +179,78 @@ namespace GymTrackerDbUOW
                           .Select(p => entity.GetType().GetProperty(p.Name).GetValue(entity))
                           .ToArray();
             }
+        }
+
+        public async Task<IReadOnlyList<T>> QueryAsync(Expression<Func<T, bool>> predicate, bool trackChanges, params string[] includePaths)
+        {
+            ArgumentNullException.ThrowIfNull(predicate);
+
+            IQueryable<T> query = _context.Set<T>();
+            if (!trackChanges)
+            {
+                query = query.AsNoTracking();
+            }
+
+            foreach (string path in includePaths ?? [])
+            {
+                if (!string.IsNullOrWhiteSpace(path))
+                {
+                    query = query.Include(path);
+                }
+            }
+
+            return await query.Where(predicate).ToListAsync();
+        }
+
+        public void StageAdd(T entity)
+        {
+            ArgumentNullException.ThrowIfNull(entity);
+            table.Add(entity);
+        }
+
+        public void StageRemove(T entity)
+        {
+            ArgumentNullException.ThrowIfNull(entity);
+            table.Remove(entity);
+        }
+
+        public Task<int> SaveAsync()
+        {
+            return _context.SaveChangesAsync();
+        }
+
+        public async Task BeginTransactionAsync()
+        {
+            if (!_context.Database.IsRelational() || _context.Database.CurrentTransaction != null)
+            {
+                return;
+            }
+
+            await _context.Database.BeginTransactionAsync();
+        }
+
+        public async Task CommitTransactionAsync()
+        {
+            var transaction = _context.Database.CurrentTransaction;
+            if (transaction == null)
+            {
+                return;
+            }
+
+            await transaction.CommitAsync();
+            await transaction.DisposeAsync();
+        }
+
+        public async Task RollbackTransactionAsync()
+        {
+            var transaction = _context.Database.CurrentTransaction;
+            if (transaction == null)
+            {
+                return;
+            }
+
+            await transaction.RollbackAsync();
+            await transaction.DisposeAsync();
         }
 
     }

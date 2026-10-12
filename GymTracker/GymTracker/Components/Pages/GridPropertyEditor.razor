@@ -63,6 +63,21 @@
                          Margin="Margin.Dense"
                          ReadOnly="isReadonly" />
     }
+    else if (prop.PropertyType == typeof(DayOfWeek) && !isNavigation)
+    {
+        <MudSelect T="DayOfWeek"
+                   Variant="Variant.Outlined"
+                   Label="@ReflectionHelper.GetDisplayName(Item, prop)"
+                   ValueChanged="@(v => SetGridValue(prop, v, Item))"
+                   FullWidth="true"
+                   Margin="Margin.Dense"
+                   Value="@(FormatGridValue(Item, prop) is DayOfWeek day ? day : DayOfWeek.Monday)">
+            @foreach (var option in Enum.GetValues<DayOfWeek>())
+            {
+                <MudSelectItem Value="@option">@option</MudSelectItem>
+            }
+        </MudSelect>
+    }
 
 }
 
